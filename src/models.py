@@ -1,7 +1,9 @@
 from sqlalchemy import Column, Integer, String, Float, Date, MetaData
 from sqlalchemy.orm import declarative_base
 
-metadata = MetaData(schema="data")
+# DuckDB doesn't strictly require schemas, usually defaults to 'main'. 
+# Removing the explicit schema="data" to avoid issues with DuckDB/SQLAlchemy
+metadata = MetaData()
 Base = declarative_base(metadata=metadata)
 
 class BeneficiarySummaryMixin:
@@ -217,3 +219,22 @@ class SrcCarrierClaims(Base, CarrierClaimsMixin):
 
 class NewCarrierClaims(Base, CarrierClaimsMixin):
     __tablename__ = 'new_carrier_claims'
+
+from sqlalchemy import Sequence
+
+class LookupVariableLabels(Base):
+    __tablename__ = 'lookup_variable_labels'
+    id = Column(Integer, Sequence('lookup_label_id_seq'), primary_key=True)
+    source_file = Column(String)
+    original_order = Column(String)
+    variable_name = Column(String)
+    label = Column(String)
+
+class LookupPaymentFormulas(Base):
+    __tablename__ = 'lookup_payment_formulas'
+    id = Column(Integer, Sequence('lookup_formula_id_seq'), primary_key=True)
+    variable_name = Column(String)
+    label = Column(String)
+    # The JSON key is "Sum of", mapping to calculation_logic
+    calculation_logic = Column(String)
+    variable_type = Column(String)

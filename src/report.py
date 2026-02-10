@@ -4,6 +4,22 @@ def generate_report_md(bene_res, claims_res, output_path="report.md"):
     """
     Generates a Markdown report from the comparison results.
     """
+    # Fetch variable labels if available
+    from src.db import engine
+    from sqlalchemy import text
+    
+    labels = {}
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("SELECT variable_name, label FROM data.lookup_variable_labels"))
+            for row in result:
+                labels[row.variable_name.strip()] = row.label.strip()
+    except Exception:
+        pass # Fallback if table doesn't exist or is empty
+
+    def get_label(col):
+        return f"{col} ({labels.get(col, '')})" if col in labels else col
+
     with open(output_path, "w") as f:
         f.write("# Data Comparison Report\n\n")
         f.write("## Executive Summary\n")
@@ -17,7 +33,16 @@ def generate_report_md(bene_res, claims_res, output_path="report.md"):
         
         if bene_res['mismatch_count'] > 0:
             f.write("### Sample Attribute Mismatches\n")
-            f.write(bene_res['mismatch_sample'].to_markdown(index=False))
+            # Rename columns in sample for clarity using lookups
+            sample = bene_res['mismatch_sample'].copy()
+            # Try to map columns if possible, but the sample has specific aliased columns (src_dob, etc.)
+            # We can just explain the columns used in comparison:
+            f.write("Columns compared:\n")
+            f.write(f"- {get_label('BENE_BIRTH_DT')}\n")
+            f.write(f"- {get_label('BENE_SEX_IDENT_CD')}\n")
+            f.write(f"- {get_label('BENE_ESRD_IND')}\n\n")
+            
+            f.write(sample.to_markdown(index=False))
             f.write("\n\n")
             
         f.write("## 2. Carrier Claims Analysis\n")
