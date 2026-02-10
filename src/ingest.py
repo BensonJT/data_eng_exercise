@@ -1,5 +1,10 @@
 import pandas as pd
+import sys
 import os
+
+# Add project root to python path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import logging
 from sqlalchemy.orm import Session
 from src.db import engine, SessionLocal
@@ -27,40 +32,40 @@ def ingest_csv(file_path, model_class, year=None, extra_cols=None):
         # Use pandas to read in chunks
         with pd.read_csv(file_path, chunksize=BATCH_SIZE, dtype=str) as reader:
             db: Session = SessionLocal()
-            total_rows = 0
-            
-            for chunk in reader:
-                # Basic cleaning: Replace NaN with None
-                chunk = chunk.where(pd.notnull(chunk), None)
+            try:
+                total_rows = 0
                 
-                # Add year if provided
-                if year:
-                    chunk['YEAR'] = year
-                
-                # Add any other extra columns
-                if extra_cols:
-                    for col, val in extra_cols.items():
-                        chunk[col] = val
+                for chunk in reader:
+                    # Basic cleaning: Replace NaN with None
+                    chunk = chunk.where(pd.notnull(chunk), None)
+                    
+                    # Add year if provided
+                    if year:
+                        chunk['YEAR'] = year
+                    
+                    # Add any other extra columns
+                    if extra_cols:
+                        for col, val in extra_cols.items():
+                            chunk[col] = val
 
-                # Convert specific columns to numeric if needed, or rely on SQLAlchemy to cast
-                # For this exercise, we kept most as String in models, but payment fields are Float.
-                # Let's attempt to convert payment fields to float, handling empty strings.
-                
-                records = chunk.to_dict(orient='records')
-                
-                # Bulk insert might be faster, but let's use add_all for simplicity with ORM
-                # ideally we use bulk_insert_mappings for performance
-                try:
-                    db.bulk_insert_mappings(model_class, records)
-                    db.commit()
-                    total_rows += len(records)
-                    logger.info(f"Ingested {total_rows} rows...")
-                except Exception as e:
-                    db.rollback()
-                    logger.error(f"Error inserting chunk: {e}")
-                    raise e
+                    # Convert specific columns to numeric if needed, or rely on SQLAlchemy to cast
+                    columns_to_inspect = chunk.columns
+                    records = chunk.to_dict(orient='records')
+                    
+                    # Bulk insert might be faster, but let's use add_all for simplicity with ORM
+                    # ideally we use bulk_insert_mappings for performance
+                    try:
+                        db.bulk_insert_mappings(model_class, records)
+                        db.commit()
+                        total_rows += len(records)
+                        logger.info(f"Ingested {total_rows} rows...")
+                    except Exception as e:
+                        db.rollback()
+                        logger.error(f"Error inserting chunk: {e}")
+                        raise e
+            finally:
+                db.close()
             
-            db.close()
             logger.info(f"Finished ingestion for {file_path}. Total rows: {total_rows}")
 
     except Exception as e:
