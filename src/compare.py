@@ -11,7 +11,7 @@ def get_row_counts():
             'src_carrier_claims', 'new_carrier_claims'
         ]
         for table in tables:
-            query = text(f"SELECT COUNT(*) FROM data.{table}")
+            query = text(f"SELECT COUNT(*) FROM {table}")
             counts[table] = conn.execute(query).scalar()
     return counts
 
@@ -24,8 +24,8 @@ def compare_beneficiaries():
         # 1. Identify missing beneficiaries in New System
         missing_query = text("""
             SELECT s.desynpuf_id, s.year
-            FROM data.src_beneficiary_summary s
-            LEFT JOIN data.new_beneficiary_summary n 
+            FROM src_beneficiary_summary s
+            LEFT JOIN new_beneficiary_summary n 
             ON s.desynpuf_id = n.desynpuf_id AND s.year = n.year
             WHERE n.desynpuf_id IS NULL
         """)
@@ -34,8 +34,8 @@ def compare_beneficiaries():
         # 2. Identify extra beneficiaries in New System (unexpected)
         extra_query = text("""
             SELECT n.desynpuf_id, n.year
-            FROM data.new_beneficiary_summary n
-            LEFT JOIN data.src_beneficiary_summary s 
+            FROM new_beneficiary_summary n
+            LEFT JOIN src_beneficiary_summary s 
             ON n.desynpuf_id = s.desynpuf_id AND n.year = s.year
             WHERE s.desynpuf_id IS NULL
         """)
@@ -49,8 +49,8 @@ def compare_beneficiaries():
                 s.bene_birth_dt as src_dob, n.bene_birth_dt as new_dob,
                 s.bene_sex_ident_cd as src_sex, n.bene_sex_ident_cd as new_sex,
                 s.bene_esrd_ind as src_esrd, n.bene_esrd_ind as new_esrd
-            FROM data.src_beneficiary_summary s
-            JOIN data.new_beneficiary_summary n 
+            FROM src_beneficiary_summary s
+            JOIN new_beneficiary_summary n 
             ON s.desynpuf_id = n.desynpuf_id AND s.year = n.year
             WHERE 
                 s.bene_birth_dt IS DISTINCT FROM n.bene_birth_dt OR
@@ -76,8 +76,8 @@ def compare_claims():
         # 1. Claims present in Source but missing in New
         missing_query = text("""
             SELECT s.clm_id
-            FROM data.src_carrier_claims s
-            LEFT JOIN data.new_carrier_claims n ON s.clm_id = n.clm_id
+            FROM src_carrier_claims s
+            LEFT JOIN new_carrier_claims n ON s.clm_id = n.clm_id
             WHERE n.clm_id IS NULL
         """)
         missing_df = pd.read_sql(missing_query, conn)
@@ -90,8 +90,8 @@ def compare_claims():
                 s.line_nch_pmt_amt_1 as src_pmt,
                 n.line_nch_pmt_amt_1 as new_pmt,
                 (s.line_nch_pmt_amt_1 - n.line_nch_pmt_amt_1) as diff
-            FROM data.src_carrier_claims s
-            JOIN data.new_carrier_claims n ON s.clm_id = n.clm_id
+            FROM src_carrier_claims s
+            JOIN new_carrier_claims n ON s.clm_id = n.clm_id
             WHERE s.line_nch_pmt_amt_1 IS DISTINCT FROM n.line_nch_pmt_amt_1
         """)
         payment_diff_df = pd.read_sql(payment_diff_query, conn)
