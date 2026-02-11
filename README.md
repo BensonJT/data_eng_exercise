@@ -30,11 +30,7 @@ This project is a data comparison and validation tool designed to compare health
    ```
 
 2. **Database**:
-   Ensure PostgreSQL is running. Configure connection details in `.env` (copy from `.env.example`).
-   ```bash
-   cp .env.example .env
-   # Edit .env with your credentials
-   ```
+   Utilize DuckDB for database operations.
 
 ## Usage
 
@@ -52,4 +48,4 @@ python main.py --report    # Generate report
 ```
 
 ## Output
-The final report will be generated as `report.md` in the project root.
+The final report will be a powerpoint presentation.
