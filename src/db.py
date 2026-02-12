@@ -5,10 +5,18 @@ from sqlalchemy.orm import sessionmaker
 
 load_dotenv()
 
-# Construct the database URL
-# DuckDB file path on the external drive
-# Note: 4 slashes for absolute path in SQLAlchemy
-DATABASE_URL = "duckdb:////mnt/e/Data Eng Exercise/data_eng.duckdb"
+# Construct the database URL from environment variable
+# DuckDB file path should be configured in .env file
+# Note: SQLAlchemy requires 4 slashes for absolute path (duckdb:////)
+DUCKDB_PATH = os.getenv('DUCKDB_PATH')
+
+if not DUCKDB_PATH:
+    raise ValueError(
+        "DUCKDB_PATH environment variable is not set. "
+        "Please copy .env.example to .env and configure the database path."
+    )
+
+DATABASE_URL = f"duckdb:///{DUCKDB_PATH}"
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

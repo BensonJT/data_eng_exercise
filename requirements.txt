@@ -4,3 +4,7 @@ psycopg2-binary
 python-dotenv
 pytest
 tabulate
+scipy
+numpy
+duckdb
+duckdb-engine

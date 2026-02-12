@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Migration Quality Assessment Report</title>
+    
+<style>
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        line-height: 1.6;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 40px 20px;
+        background: #f8f9fa;
+        color: #2d3748;
+    }
+    h1 {
+        color: #1a202c;
+        border-bottom: 4px solid #667eea;
+        padding-bottom: 15px;
+        margin-bottom: 30px;
+        font-size: 2.5em;
+    }
+    h2 {
+        color: #2d3748;
+        margin-top: 40px;
+        padding: 15px 0 15px 20px;
+        border-left: 5px solid #667eea;
+        background: linear-gradient(90deg, #f0f4ff 0%, transparent 100%);
+    }
+    h3 {
+        color: #4a5568;
+        margin-top: 30px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #e2e8f0;
+    }
+    table {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 25px 0;
+        background: white;
+        box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    thead {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+    th {
+        padding: 16px;
+        text-align: left;
+        font-weight: 600;
+        font-size: 0.95em;
+        letter-spacing: 0.5px;
+    }
+    td {
+        padding: 14px 16px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    tbody tr:nth-child(even) {
+        background-color: #f7fafc;
+    }
+    tbody tr:hover {
+        background-color: #edf2f7;
+        transition: background-color 0.2s;
+    }
+    .status-excellent {
+        background-color: #48bb78 !important;
+        color: white !important;
+        font-weight: bold;
+        text-align: center;
+        border-radius: 4px;
+        padding: 8px 12px !important;
+    }
+    .status-acceptable {
+        background-color: #ed8936 !important;
+        color: white !important;
+        font-weight: bold;
+        text-align: center;
+        border-radius: 4px;
+        padding: 8px 12px !important;
+    }
+    .status-critical {
+        background-color: #f56565 !important;
+        color: white !important;
+        font-weight: bold;
+        text-align: center;
+        border-radius: 4px;
+        padding: 8px 12px !important;
+    }
+    code {
+        background: #edf2f7;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: 'Courier New', monospace;
+        font-size: 0.9em;
+    }
+    a {
+        color: #667eea;
+        text-decoration: none;
+        font-weight: 500;
+    }
+    a:hover {
+        text-decoration: underline;
+    }
+    hr {
+        border: none;
+        border-top: 2px solid #e2e8f0;
+        margin: 40px 0;
+    }
+    ul {
+        padding-left: 25px;
+    }
+    li {
+        margin: 8px 0;
+    }
+    .number-cell {
+        text-align: right !important;
+        font-variant-numeric: tabular-nums;
+    }
+    @media print {
+        body { background: white; }
+        table { box-shadow: none; border: 1px solid #ddd; }
+    }
+</style>
+
+</head>
+<body>
+<h1>Data Migration Quality Assessment Report</h1>
+
+<h2>Executive Summary</h2>
+
+<p>This report evaluates the quality of the healthcare claims data migration from the legacy system (Source) to the new system (New). The analysis employs Six Sigma methodology to quantify data quality and identifies areas requiring remediation.</p>
+
+<h3>Migration Scorecard</h3>
+
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<p>|--------|-------|--------|</p>
+<tr>
+<td>Carrier Claims Quality</td>
+<td>4.58σ (1,095 DPMO, 99.89% yield)</td>
+<td class="status-excellent">✅ Excellent</td>
+</tr>
+<tr>
+<td>Beneficiary Summary Quality</td>
+<td>4.68σ (768 DPMO, 99.92% yield)</td>
+<td class="status-excellent">✅ Excellent</td>
+</tr>
+<tr>
+<td>Missing Beneficiaries</td>
+<td class="number-cell">159</td>
+<td class="status-critical">❌ Critical</td>
+</tr>
+<tr>
+<td>Missing Claims</td>
+<td class="number-cell">4,777</td>
+<td class="status-critical">❌ Critical</td>
+</tr>
+<tr>
+<td>Payment Discrepancies</td>
+<td class="number-cell">82,699</td>
+<td class="status-critical">❌ Critical</td>
+</tr>
+</tbody>
+</table>
+<hr>
+
+<h2>1. Six Sigma Quality Analysis</h2>
+
+<p><strong>Six Sigma</strong> measures data quality in defects per million opportunities (DPMO). Higher sigma levels indicate better quality:</p>
+<ul>
+<li><strong>6σ</strong>: 3.4 DPMO (99.9997% yield) - World-class</li>
+<li><strong>5σ</strong>: 233 DPMO (99.98% yield) - Excellent</li>
+<li><strong>4σ</strong>: 6,210 DPMO (99.38% yield) - Good</li>
+<li><strong>3σ</strong>: 66,807 DPMO (93.32% yield) - Acceptable</li>
+<li><strong>2σ</strong>: 308,538 DPMO (69.15% yield) - Poor</li>
+</ul>
+<h3>Overall Migration Quality</h3>
+
+<table>
+<thead>
+<tr>
+<th>Dataset</th>
+<th>Total Units</th>
+<th>Total Defects</th>
+<th>Sigma Level</th>
+<th>DPMO</th>
+<th>Yield %</th>
+</tr>
+</thead>
+<tbody>
+<p>|---------|-------------|---------------|-------------|------|----------|</p>
+<tr>
+<td>Carrier Claims</td>
+<td class="number-cell">4,746,577</td>
+<td class="number-cell">530,376</td>
+<td class="number-cell">4.58σ</td>
+<td class="number-cell">1,095</td>
+<td>99.89%</td>
+</tr>
+<tr>
+<td>Beneficiary Summary</td>
+<td class="number-cell">343,803</td>
+<td class="number-cell">8,193</td>
+<td class="number-cell">4.68σ</td>
+<td class="number-cell">768</td>
+<td>99.92%</td>
+</tr>
+</tbody>
+</table>
+<p>📊 <strong>Detailed Analysis</strong>: </p>
+
+<p><strong><a href="data/six_sigma.csv">six_sigma.csv</a></strong> - Overall quality metrics</p>
+<ul>
+<li>Contains: SUBJECT, TOTAL_UNITS, TOTAL_DEFECTS, TOTAL_OPPORTUNITIES, DPMO, YIELD, SIGMA_LEVEL</li>
+<li>Use this to: Track overall migration quality score and identify which dataset (Carrier Claims vs Beneficiary) needs priority attention</li>
+</ul>
+<p><strong><a href="data/six_sigma_carrier.csv">six_sigma_carrier.csv</a></strong> - Field-level carrier claim defects (102 fields analyzed)</p>
+<ul>
+<li>Contains: SOURCE, FIELD_FAMILY, TOTAL_DEFECTS, TOTAL_OPPORTUNITIES, DPMO, SIGMA_LEVEL</li>
+<li>Use this to: Identify which specific carrier claim fields have the highest error rates</li>
+<li>Fields analyzed include: ICD9 diagnosis codes, NPI identifiers, tax numbers, HCPCS codes, payment amounts, deductibles, coinsurance, processing indicators</li>
+<li>Sort by TOTAL_DEFECTS descending to prioritize remediation efforts</li>
+</ul>
+<p><strong><a href="data/six_sigma_beneficiary.csv">six_sigma_beneficiary.csv</a></strong> - Field-level beneficiary defects (31 fields analyzed)</p>
+<ul>
+<li>Contains: SOURCE, FIELD_FAMILY, TOTAL_DEFECTS, TOTAL_OPPORTUNITIES, DPMO, SIGMA_LEVEL</li>
+<li>Use this to: Identify which beneficiary attributes have the highest error rates</li>
+<li>Fields analyzed include: Demographics (birth/death dates, sex, race), coverage months, chronic conditions (11 conditions), financial fields (reimbursements, benefits, payments)</li>
+<li>Focus on fields with DPMO > 100,000 (below 3σ) for immediate remediation</li>
+</ul>
+<h3>Top Defect Fields</h3>
+
+<p><strong>Carrier Claims - Highest Error Fields:</strong></p>
+
+<table>
+<thead>
+<tr>
+<th>Field Family</th>
+<th>Total Defects</th>
+<th>DPMO</th>
+<th>Sigma Level</th>
+</tr>
+</thead>
+<tbody>
+<p>|--------------|---------------|------|-------------|</p>
+<tr>
+<td>LINE_PRCSG_IND_CD</td>
+<td class="number-cell">75,497</td>
+<td class="number-cell">15,905</td>
+<td class="number-cell">3.66σ</td>
+</tr>
+<tr>
+<td>LINE_ICD9_DGNS_CD</td>
+<td class="number-cell">75,238</td>
+<td class="number-cell">15,851</td>
+<td class="number-cell">3.66σ</td>
+</tr>
+<tr>
+<td>TAX_NUM</td>
+<td class="number-cell">75,176</td>
+<td class="number-cell">15,837</td>
+<td class="number-cell">3.66σ</td>
+</tr>
+<tr>
+<td>PRF_PHYSN_NPI</td>
+<td class="number-cell">75,169</td>
+<td class="number-cell">15,836</td>
+<td class="number-cell">3.66σ</td>
+</tr>
+<tr>
+<td>HCPCS_CD</td>
+<td class="number-cell">75,106</td>
+<td class="number-cell">15,823</td>
+<td class="number-cell">3.66σ</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Beneficiary Summary - Highest Error Fields:</strong></p>
+
+<table>
+<thead>
+<tr>
+<th>Field Family</th>
+<th>Total Defects</th>
+<th>DPMO</th>
+<th>Sigma Level</th>
+</tr>
+</thead>
+<tbody>
+<p>|--------------|---------------|------|-------------|</p>
+<tr>
+<td>BENE_BIRTH_DT</td>
+<td class="number-cell">496</td>
+<td class="number-cell">1,442</td>
+<td class="number-cell">4.50σ</td>
+</tr>
+<tr>
+<td>BENE_HI_CVRAGE_TOT_MONS</td>
+<td class="number-cell">337</td>
+<td class="number-cell">980</td>
+<td class="number-cell">4.61σ</td>
+</tr>
+<tr>
+<td>BENE_SMI_CVRAGE_TOT_MONS</td>
+<td class="number-cell">322</td>
+<td class="number-cell">936</td>
+<td class="number-cell">4.63σ</td>
+</tr>
+<tr>
+<td>BENE_COUNTY_CD</td>
+<td class="number-cell">318</td>
+<td class="number-cell">924</td>
+<td class="number-cell">4.63σ</td>
+</tr>
+<tr>
+<td>BENE_DEATH_DT</td>
+<td class="number-cell">318</td>
+<td class="number-cell">924</td>
+<td class="number-cell">4.63σ</td>
+</tr>
+</tbody>
+</table>
+<hr>
+
+<h2>2. Financial Impact Analysis</h2>
+
+<p><strong>Pareto Analysis</strong> identifies which field families contribute most to financial errors. The 80/20 rule typically applies: ~80% of financial variance comes from ~20% of fields.</p>
+
+<h3>Carrier Claims Financial Variance</h3>
+
+<table>
+<thead>
+<tr>
+<th>Field Family</th>
+<th>Financial Variance</th>
+<th>% of Total</th>
+<th>Cumulative %</th>
+</tr>
+</thead>
+<tbody>
+<p>|--------------|-------------------|------------|---------------|</p>
+<tr>
+<td>LINE_NCH_PMT_AMT</td>
+<td>$158,480.91</td>
+<td>36.5%</td>
+<td>36.5%</td>
+</tr>
+<tr>
+<td>LINE_BENE_PRMRY_PYR_PD_AMT</td>
+<td>$98,772.86</td>
+<td>22.7%</td>
+<td>59.2%</td>
+</tr>
+<tr>
+<td>LINE_BENE_PTB_DDCTBL_AMT</td>
+<td>$96,806.45</td>
+<td>22.3%</td>
+<td>81.5%</td>
+</tr>
+<tr>
+<td>LINE_ALOWD_CHRG_AMT</td>
+<td>$62,816.30</td>
+<td>14.5%</td>
+<td>96.0%</td>
+</tr>
+<tr>
+<td>LINE_COINSRNC_AMT</td>
+<td>$17,507.34</td>
+<td>4.0%</td>
+<td>100.0%</td>
+</tr>
+<tr>
+<td>**TOTAL**</td>
+<td>**$434,383.86**</td>
+<td>**100%**</td>
+<td class="number-cell">-</td>
+</tr>
+</tbody>
+</table>
+<p>📊 <strong>Detailed Data</strong>: <strong><a href="data/financial_impact_carrier_claim.csv">financial_impact_carrier_claim.csv</a></strong></p>
+
+<p><strong>CSV Contents:</strong></p>
+<ul>
+<li>Columns: DATA_SET, FIELD_FAMILY, FINANCIAL_VARIANCE, RUNNING_PCT_OF_TOTAL</li>
+<li>Contains absolute dollar variance aggregated by field family</li>
+<li>Pre-sorted by financial impact (highest to lowest)</li>
+</ul>
+<p><strong>How to Use:</strong></p>
+<ul>
+<li>Identify the 20% of fields causing 80% of financial variance (Pareto principle)</li>
+<li>Focus remediation on field families with RUNNING_PCT_OF_TOTAL < 0.8 (first ~80% of errors)</li>
+<li>Use this to justify resource allocation for data quality improvement efforts</li>
+<li>Cross-reference with six_sigma_carrier.csv to find fields that are both high-defect AND high-cost</li>
+</ul>
+<h3>Beneficiary Summary Financial Variance</h3>
+
+<table>
+<thead>
+<tr>
+<th>Field Family</th>
+<th>Financial Variance</th>
+<th>% of Total</th>
+<th>Cumulative %</th>
+</tr>
+</thead>
+<tbody>
+<p>|--------------|-------------------|------------|---------------|</p>
+<tr>
+<td>MEDREIMB_OP</td>
+<td>$10,924.62</td>
+<td>30.7%</td>
+<td>30.7%</td>
+</tr>
+<tr>
+<td>MEDREIMB_IP</td>
+<td>$7,004.07</td>
+<td>19.7%</td>
+<td>50.3%</td>
+</tr>
+<tr>
+<td>MEDREIMB_CAR</td>
+<td>$4,458.42</td>
+<td>12.5%</td>
+<td>62.9%</td>
+</tr>
+<tr>
+<td>BENRES_IP</td>
+<td>$3,231.46</td>
+<td>9.1%</td>
+<td>71.9%</td>
+</tr>
+<tr>
+<td>BENRES_CAR</td>
+<td>$2,466.78</td>
+<td>6.9%</td>
+<td>78.9%</td>
+</tr>
+<tr>
+<td>PPPYMT_IP</td>
+<td>$2,128.46</td>
+<td>6.0%</td>
+<td>84.8%</td>
+</tr>
+<tr>
+<td>PPPYMT_CAR</td>
+<td>$1,996.32</td>
+<td>5.6%</td>
+<td>90.5%</td>
+</tr>
+<tr>
+<td>BENRES_OP</td>
+<td>$1,907.74</td>
+<td>5.4%</td>
+<td>95.8%</td>
+</tr>
+<tr>
+<td>PPPYMT_OP</td>
+<td>$1,491.36</td>
+<td>4.2%</td>
+<td>100.0%</td>
+</tr>
+<tr>
+<td>**TOTAL**</td>
+<td>**$35,609.23**</td>
+<td>**100%**</td>
+<td class="number-cell">-</td>
+</tr>
+</tbody>
+</table>
+<p>📊 <strong>Detailed Data</strong>: <strong><a href="data/financial_impact_beneficiary.csv">financial_impact_beneficiary.csv</a></strong></p>
+
+<p><strong>CSV Contents:</strong></p>
+<ul>
+<li>Columns: DATA_SET, FIELD_FAMILY, FINANCIAL_VARIANCE, RUNNING_PCT_OF_TOTAL</li>
+<li>Financial variance across 9 beneficiary reimbursement fields (IP, OP, CAR × MEDREIMB, BENRES, PPPYMT)</li>
+<li>Aggregates all absolute dollar differences between source and new system</li>
+</ul>
+<p><strong>How to Use:</strong></p>
+<ul>
+<li>Identify which payment types (Inpatient, Outpatient, Carrier) have highest variance</li>
+<li>Compare MEDREIMB (Medicare reimbursement) vs BENRES (beneficiary responsibility) vs PPPYMT (primary payer) errors</li>
+<li>Use for financial reconciliation and to estimate potential claim adjustment volume</li>
+</ul>
+<hr>
+
+<h2>3. Beneficiary Data Quality</h2>
+
+<h3>Summary of Beneficiary Discrepancies</h3>
+
+<table>
+<thead>
+<tr>
+<th>Discrepancy Type</th>
+<th>Count</th>
+<th>CSV Export</th>
+</tr>
+</thead>
+<tbody>
+<p>|------------------|-------|------------|</p>
+<tr>
+<td>Missing in New System</td>
+<td class="number-cell">159</td>
+<td>[missing_beneficiaries.csv](data/missing_beneficiaries.csv)</td>
+</tr>
+<tr>
+<td>Extra in New System</td>
+<td class="number-cell">0</td>
+<td>[extra_beneficiaries.csv](data/extra_beneficiaries.csv)</td>
+</tr>
+<tr>
+<td>Attribute Mismatches</td>
+<td class="number-cell">178</td>
+<td>[beneficiary_attribute_mismatches.csv](data/beneficiary_attribute_mismatches.csv)</td>
+</tr>
+<tr>
+<td>Date Differences (DOB/DOD)</td>
+<td class="number-cell">178</td>
+<td>[beneficiary_date_differences.csv](data/beneficiary_date_differences.csv)</td>
+</tr>
+<tr>
+<td>Comprehensive Line Differences</td>
+<td class="number-cell">1,322</td>
+<td>[comprehensive_beneficiary_differences.csv](data/comprehensive_beneficiary_differences.csv)</td>
+</tr>
+</tbody>
+</table>
+<h3>Sample Attribute Mismatches</h3>
+
+<p>The following fields were compared: Birth Date, Sex, Race, ESRD Indicator</p>
+
+<table>
+<thead>
+<tr>
+<th>DESYNPUF_ID</th>
+<th>YEAR</th>
+<th>src_BENE_BIRTH_DT</th>
+<th>new_BENE_BIRTH_DT</th>
+<th>src_BENE_SEX_IDENT_CD</th>
+<th>new_BENE_SEX_IDENT_CD</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>283EE6C929EA6E2A</td>
+<td class="number-cell">2010</td>
+<td class="number-cell">19310601</td>
+<td class="number-cell">19300903</td>
+<td class="number-cell">1</td>
+<td class="number-cell">1</td>
+</tr>
+<tr>
+<td>2B868D4AF1ED6CB9</td>
+<td class="number-cell">2010</td>
+<td class="number-cell">19390401</td>
+<td class="number-cell">19380503</td>
+<td class="number-cell">2</td>
+<td class="number-cell">2</td>
+</tr>
+<tr>
+<td>2C606D7AF2DA6CDF</td>
+<td class="number-cell">2010</td>
+<td class="number-cell">19230301</td>
+<td class="number-cell">19221105</td>
+<td class="number-cell">2</td>
+<td class="number-cell">2</td>
+</tr>
+<tr>
+<td>2D6220567C59C1A7</td>
+<td class="number-cell">2010</td>
+<td class="number-cell">19350701</td>
+<td class="number-cell">19360325</td>
+<td class="number-cell">1</td>
+<td class="number-cell">1</td>
+</tr>
+<tr>
+<td>30C7F0B30079FAFC</td>
+<td class="number-cell">2010</td>
+<td class="number-cell">19480801</td>
+<td class="number-cell">19471219</td>
+<td class="number-cell">1</td>
+<td class="number-cell">1</td>
+</tr>
+</tbody>
+</table>
+<p>_Showing 5 of 178 total mismatches. See CSV for complete list._</p>
+
+<h3>Detailed CSV Exports - Beneficiary Analysis</h3>
+
+<p><strong>1. <a href="data/missing_beneficiaries.csv">missing_beneficiaries.csv</a></strong> (159 records)</p>
+
+<ul>
+<li><strong>Columns</strong>: DESYNPUF_ID, BENE_DEATH_YEAR, YEAR, FINDING</li>
+<li><strong>What it shows</strong>: Beneficiaries present in source system but missing in new system</li>
+<li><strong>Key filter</strong>: Only includes beneficiaries who either (a) had no death date, or (b) death year is after the record year (should still be active)</li>
+<li><strong>Action required</strong>: Investigate ETL process - these records may indicate data loss during migration</li>
+<li><strong>Business impact</strong>: Missing beneficiaries = missing claims = potential revenue loss</li>
+</ul>
+<p><strong>2. <a href="data/extra_beneficiaries.csv">extra_beneficiaries.csv</a></strong> (0 records)</p>
+
+<ul>
+<li><strong>Columns</strong>: DESYNPUF_ID, BENE_DEATH_YEAR, YEAR, FINDING</li>
+<li><strong>What it shows</strong>: Beneficiaries present in new system but NOT in source system</li>
+<li><strong>Possible causes</strong>: Duplicate creation, test data leakage, or incorrect source extraction</li>
+<li><strong>Action required</strong>: Review and potentially purge if these are erroneous records</li>
+</ul>
+<p><strong>3. <a href="data/beneficiary_attribute_mismatches.csv">beneficiary_attribute_mismatches.csv</a></strong> (178 records)</p>
+
+<ul>
+<li><strong>Columns</strong>: DESYNPUF_ID, YEAR, src_BENE_BIRTH_DT, new_BENE_BIRTH_DT, src_BENE_SEX_IDENT_CD, new_BENE_SEX_IDENT_CD, src_BENE_RACE_CD, new_BENE_RACE_CD, src_ERSD_IND, new_ERSD_IND, FINDING</li>
+<li><strong>What it shows</strong>: Beneficiaries where core demographic attributes changed between systems</li>
+<li><strong>Why this matters</strong>: Demographics should be immutable - changes indicate transformation errors</li>
+<li><strong>Action required</strong>: </li>
+<li>- Birth date changes: Review date parsing logic (format conversions, timezone issues)</li>
+<li>- Sex/Race changes: Check lookup table mappings and code standardization</li>
+<li>- ESRD flag changes: Verify chronic condition derivation logic</li>
+</ul>
+<p><strong>4. <a href="data/beneficiary_date_differences.csv">beneficiary_date_differences.csv</a></strong> (178 records)</p>
+
+<ul>
+<li><strong>Columns</strong>: DESYNPUF_ID, src_dob, new_dob, src_dod, new_dod</li>
+<li><strong>What it shows</strong>: Focused view of birth and death date discrepancies</li>
+<li><strong>Common patterns to look for</strong>:</li>
+<li>- Date format issues (YYYYMMDD vs YYYY-MM-DD)</li>
+<li>- Day/month transposition (01/06 vs 06/01)</li>
+<li>- Year arithmetic errors (+/- 1 year patterns)</li>
+<li><strong>Action required</strong>: Sample records, identify systematic vs random errors, fix transformation logic</li>
+</ul>
+<p><strong>5. <a href="data/comprehensive_beneficiary_differences.csv">comprehensive_beneficiary_differences.csv</a></strong> (1,322 records)</p>
+
+<ul>
+<li><strong>Columns</strong>: All 33 beneficiary summary fields (DESYNPUF_ID, YEAR, demographics, coverage, conditions, financials)</li>
+<li><strong>What it shows</strong>: ANY row where ANY field differs between source and new (SQL EXCEPT operation)</li>
+<li><strong>Size</strong>: Largest beneficiary CSV - this is your master list of all differences</li>
+<li><strong>How to use</strong>:</li>
+<li>- Import into Excel/SQL and pivot by specific columns to find patterns</li>
+<li>- Compare financial fields (MEDREIMB_*, BENRES_*, PPPYMT_*) to quantify dollar impact per beneficiary</li>
+<li>- Cross-reference DESYNPUF_IDs with the other CSVs to understand root causes</li>
+<li>- Use for detailed reconciliation and auditing</li>
+</ul>
+<hr>
+
+<h2>4. Carrier Claims Data Quality</h2>
+
+<h3>Summary of Claims Discrepancies</h3>
+
+<table>
+<thead>
+<tr>
+<th>Discrepancy Type</th>
+<th>Count</th>
+<th>CSV Export</th>
+</tr>
+</thead>
+<tbody>
+<p>|------------------|-------|------------|</p>
+<tr>
+<td>Missing Claims</td>
+<td class="number-cell">4,777</td>
+<td>[missing_claims.csv](data/missing_claims.csv)</td>
+</tr>
+<tr>
+<td>Payment Amount Discrepancies</td>
+<td class="number-cell">82,699</td>
+<td>[claim_payment_amount_discrepancies.csv](data/claim_payment_amount_discrepancies.csv)</td>
+</tr>
+<tr>
+<td>Orphan Claims (4-way match)</td>
+<td class="number-cell">5,242</td>
+<td>[comprehensive_orphan_claims.csv](data/comprehensive_orphan_claims.csv)</td>
+</tr>
+</tbody>
+</table>
+<h3>Sample Payment Discrepancies</h3>
+
+<table>
+<thead>
+<tr>
+<th>CLM_ID</th>
+<th>CLM_FROM_DT</th>
+<th>src_pmt</th>
+<th>new_pmt</th>
+<th>variance</th>
+</tr>
+</thead>
+<tbody>
+<p>|----------------:|--------------:|----------:|----------:|-----------:|</p>
+<tr>
+<td class="number-cell">887183387821152</td>
+<td class="number-cell">20101109</td>
+<td class="number-cell">30</td>
+<td class="number-cell">27</td>
+<td class="number-cell">3</td>
+</tr>
+<tr>
+<td class="number-cell">887473386966448</td>
+<td class="number-cell">20080531</td>
+<td class="number-cell">0</td>
+<td class="number-cell">5</td>
+<td class="number-cell">-5</td>
+</tr>
+<tr>
+<td class="number-cell">887883389139678</td>
+<td class="number-cell">20100629</td>
+<td class="number-cell">0</td>
+<td class="number-cell">5</td>
+<td class="number-cell">-5</td>
+</tr>
+<tr>
+<td class="number-cell">887913386549027</td>
+<td class="number-cell">20090407</td>
+<td class="number-cell">60</td>
+<td class="number-cell">54</td>
+<td class="number-cell">6</td>
+</tr>
+<tr>
+<td class="number-cell">887723388459696</td>
+<td class="number-cell">20080324</td>
+<td class="number-cell">20</td>
+<td class="number-cell">18</td>
+<td class="number-cell">2</td>
+</tr>
+</tbody>
+</table>
+<p>_Showing 5 of 82,699 total payment discrepancies. See CSV for complete list._</p>
+
+<h3>Detailed CSV Exports - Claims Analysis</h3>
+
+<p><strong>1. <a href="data/missing_claims.csv">missing_claims.csv</a></strong> (4,777 records)</p>
+
+<ul>
+<li><strong>Columns</strong>: CLM_ID, FINDING</li>
+<li><strong>What it shows</strong>: Claims present in source OR new system (UNION of both directions)</li>
+<li><strong>FINDING values</strong>:</li>
+<li>- 'Error: Claim Missing in New File' = Claims lost during migration</li>
+<li>- 'Error: Claim Present in New File, Not in Original File' = Claims created erroneously</li>
+<li><strong>Business impact</strong>: Missing claims = unbilled services = revenue loss</li>
+<li><strong>Action required</strong>: Group by CLM_FROM_DT (claim date) to identify if losses are concentrated in specific time periods</li>
+</ul>
+<p><strong>2. <a href="data/claim_payment_amount_discrepancies.csv">claim_payment_amount_discrepancies.csv</a></strong> (82,699 records, 5.2 MB)</p>
+
+<ul>
+<li><strong>Columns</strong>: CLM_ID, record_status, STATE_NAME, CLM_FROM_DT, src_pmt, new_pmt, processing_ind, allowed_amt, business_rule_status, variance</li>
+<li><strong>What it shows</strong>: Claims where LINE_NCH_PMT_AMT_1 (NCH payment amount line 1) differs between systems</li>
+<li><strong>Critical field: business_rule_status</strong>:</li>
+<li>- 'Valid' = Payment should match based on business rules (allowed_amt, processing_ind)</li>
+<li>- 'Invalid' = Payment difference may be expected due to processing rules</li>
+<li><strong>How to use</strong>:</li>
+<li>- Filter WHERE business_rule_status = 'Valid' AND variance > threshold (e.g., $10)</li>
+<li>- Group by STATE_NAME to identify geographic patterns</li>
+<li>- Sort by ABS(variance) descending to prioritize high-dollar errors</li>
+<li>- Calculate total financial exposure: SUM(ABS(variance))</li>
+<li><strong>Contains</strong>: Full claim-level detail for payment reconciliation and adjustment processing</li>
+</ul>
+<p><strong>3. <a href="data/comprehensive_orphan_claims.csv">comprehensive_orphan_claims.csv</a></strong> (5,242 records, 3.9 MB)</p>
+
+<ul>
+<li><strong>Columns</strong>: All 142 carrier claim fields (DESYNPUF_ID, CLM_ID, CLM_FROM_DT, CLM_THRU_DT, diagnosis codes, procedures, NPIs, financials, etc.)</li>
+<li><strong>What it shows</strong>: Claims in new system that don't match on 4-way key (DESYNPUF_ID, CLM_ID, CLM_FROM_DT, CLM_THRU_DT)</li>
+<li><strong>Why this matters</strong>: Matching on CLM_ID alone found fewer orphans - using 4-way match finds date mismatches</li>
+<li><strong>Possible causes</strong>:</li>
+<li>- Date transformation errors (CLM_FROM_DT or CLM_THRU_DT changed)</li>
+<li>- Beneficiary ID transformation errors (DESYNPUF_ID changed)</li>
+<li>- Claim ID transformation errors (CLM_ID changed)</li>
+<li>- Combination of above = claim exists but with wrong metadata</li>
+<li><strong>How to investigate</strong>:</li>
+<li>- Check if CLM_ID exists in source with different dates</li>
+<li>- Check if DESYNPUF_ID mapping is correct</li>
+<li>- Look for CLM_FROM_DT = '20231332' (invalid dates that should be '20080304')</li>
+<li>- These claims may need manual reconciliation or reprocessing</li>
+</ul>
+<hr>
+
+<h2>5. Recommendations</h2>
+
+<p>1. <strong>FOCUS AREA</strong>: LINE_PRCSG_IND_CD has 75,497 defects. Prioritize data cleansing and transformation logic review for this field.</p>
+
+<p>2. <strong>FINANCIAL PRIORITY</strong>: LINE_NCH_PMT_AMT accounts for 36.5% of total financial variance ($158,480.91). Address this field first for maximum impact.</p>
+
+<p>3. <strong>DATA LOSS</strong>: 159 beneficiaries missing in new system. Verify ETL completeness and investigate potential data loss.</p>
+
+<p>4. <strong>DATA LOSS</strong>: 4,777 claims missing in new system. Review ingestion logs and verify source-to-target mapping.</p>
+
+<hr>
+
+<h2>Conclusion</h2>
+
+<p>The migration demonstrates <strong>good overall quality</strong> with an average sigma level of 4.63σ. However, address the identified discrepancies before final production cutover.</p>
+
+<p><strong>Next Steps:</strong></p>
+<p>1. Review detailed CSV exports for complete defect lists</p>
+<p>2. Prioritize remediation based on Six Sigma and Financial Impact analysis</p>
+<p>3. Re-run comparison after implementing fixes</p>
+<p>4. Target minimum 4σ quality before production deployment</p>
+
+<hr>
+
+<p>_Report generated by Data Migration Quality Assessment Pipeline_</p>
+
+
+</body>
+</html>
