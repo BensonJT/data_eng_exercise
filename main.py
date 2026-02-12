@@ -39,7 +39,8 @@ def main():
     if args.all or args.ingest:
         logger.info("Running data ingestion...")
         run_ingestion()
-    
+        logger.info("✅ Ingestion complete")
+
     if args.all or args.validate:
         logger.info("Validating data ingestion...")
         run_validation()
@@ -52,22 +53,26 @@ def main():
         # Automatically run transformation after ingestion
         logger.info("Running data transformation (creating views and audit tables)...")
         run_transform()
+        logger.info("✅ Transformation complete")
 
     if args.all or args.compare or args.report:
         logger.info("Running comparison...")
         run_comparison()
+        logger.info("✅ Comparison complete")
         
         six_sigma_res = calc_six_sigma()
         print("\n--- Six Sigma Analysis ---")
         print(f"Six Sigma: {six_sigma_res}")
         print(f"Six Sigma Carrier: {six_sigma_res['six_sigma_carrier']}")
         print(f"Six Sigma Beneficiary: {six_sigma_res['six_sigma_beneficiary']}")
-        
+        logger.info("✅ Six Sigma complete")
+
         financial_impact_res = calc_financial_impact()
         print("\n--- Financial Impact Analysis ---")
         print(f"Financial Impact Claim: {financial_impact_res['financial_impact_claim']}")
         print(f"Financial Impact Beneficiary: {financial_impact_res['financial_impact_beneficiary']}")
-        
+        logger.info("✅ Financial Impact complete")
+
         print("\n--- Beneficiary Comparison ---")
         bene_res = compare_beneficiaries()
         print(f"Records with Discrepancies: {bene_res['bene_records_with_discrepancies']}")
@@ -81,7 +86,8 @@ def main():
         print(f"Mismatch Sample: {bene_res['mismatch_sample']}")
         print(f"Comprehensive Beneficiary Sample: {bene_res['comprehensive_sample']}")
         print(f"Records with Discrepancies Sample: {bene_res['bene_records_with_discrepancies_sample']}")
-        
+        logger.info("✅ Beneficiary Comparison complete")
+
         print("\n--- Claims Comparison ---")
         claims_res = compare_claims()
         print(f"Records with Discrepancies: {claims_res['claim_records_with_discrepancies']}")
@@ -91,6 +97,7 @@ def main():
         print(f"Payment Mismatch Sample: {claims_res['payment_mismatch_sample']}")
         print(f"Comprehensive Orphan Claims Sample: {claims_res['comprehensive_orphan_claims_sample']}")
         print(f"Records with Discrepancies Sample: {claims_res['claim_records_with_discrepancies_sample']}")
+        logger.info("✅ Claims Comparison complete")
         
         if args.all or args.report:
             logger.info("Generating report...")
@@ -104,6 +111,8 @@ def main():
                 logger.info("✅ Both reports generated: report.md and report.html")
             except Exception as e:
                 logger.warning(f"HTML conversion failed: {e}. Markdown report still available.")
+        
+            logger.info("✅ Report complete")
 
 if __name__ == "__main__":
     main()
