@@ -23,7 +23,7 @@ def html_table_row(cells, row_num, status_col=None):
         # Apply status-specific styling
         cell_style = f'padding: 12px; border-bottom: 1px solid #e2e8f0;'
         
-        if status_col is not None and i == status_col:
+    if status_col is not None and i == status_col:
         # Color-code status column
         if '🏆' in str(cell) or 'World-class' in str(cell):
             cell_style += ' background-color: #ffda3a; color: black; font-weight: bold; text-align: center;'  # gold
