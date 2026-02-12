@@ -22,19 +22,19 @@ The pipeline consists of four main stages executed in sequence:
    - Processes files iteratively without loading entire datasets into memory
    - Transformation runs automatically after ingestion (unless using --validate)
 
-3. **Validate Ingestion** (`--validate`) - *Optional but recommended*
+3. **Validate Ingestion** (`--validate`, `--ingest`) - *Optional but recommended*
    - Validates data was ingested correctly by comparing database sums to CSV file sums
    - Should be run AFTER `--ingest` and BEFORE transformation
    - Checks 4 key metrics across source and new system datasets
    - Helps catch any data corruption or incomplete ingestion early
 
-4. **Transform** (`--transform`), automatic after ingest, or explicit before compare
+4. **Transform** (`--transform`, `--ingest`, `--validate`)
    - **Executes SQL Scripts* 
    - Creates analytical views and audit tables
    - Performs complex SQL transformations
    - Prepares data for comparison
 
-5. **Compare & Report** (`--compare`, `--report`)
+5. **Compare & Report** (`--compare`, `--report`, `--transform`, `--ingest`, `--validate`)
    - Executes comparison logic across multiple dimensions
    - Generates 17 output CSV files with detailed analysis
    - Creates Markdown and HTML reports

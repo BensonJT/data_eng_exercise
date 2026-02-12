@@ -41,21 +41,18 @@ def main():
         run_ingestion()
         logger.info("✅ Ingestion complete")
 
-    if args.all or args.validate:
+    if args.all or args.ingest or args.validate:
         logger.info("Validating data ingestion...")
         run_validation()
         logger.info("✅ Validation complete")
         
     # Only run transformation if we've completed ingestion (and optionally validation)
-    if args.all or (not args.validate and args.ingest) 
-        or (args.validate and not args.ingest)
-        or (args.transform):
-        # Automatically run transformation after ingestion
+    if args.all or args.ingest or args.validate or args.transform:
         logger.info("Running data transformation (creating views and audit tables)...")
         run_transform()
         logger.info("✅ Transformation complete")
 
-    if args.all or args.compare or args.report:
+    if args.all or args.ingest or args.validate or args.transform or args.compare or args.report:
         logger.info("Running comparison...")
         run_comparison()
         logger.info("✅ Comparison complete")
@@ -99,7 +96,7 @@ def main():
         print(f"Records with Discrepancies Sample: {claims_res['claim_records_with_discrepancies_sample']}")
         logger.info("✅ Claims Comparison complete")
         
-        if args.all or args.report:
+        if args.all or args.ingest or args.validate or args.transform or args.compare or args.report:
             logger.info("Generating report...")
             generate_report_md(bene_res, claims_res, six_sigma_res, financial_impact_res)
             
