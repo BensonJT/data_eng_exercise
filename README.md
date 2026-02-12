@@ -28,8 +28,8 @@ The pipeline consists of four main stages executed in sequence:
    - Checks 4 key metrics across source and new system datasets
    - Helps catch any data corruption or incomplete ingestion early
 
-4. **Transform** (automatic after ingest, or explicit before compare)
-   - **Loads lookup tables** (state codes, sex codes, race codes, payment formulas, variable labels)
+4. **Transform** (`--transform`), automatic after ingest, or explicit before compare
+   - **Executes SQL Scripts* 
    - Creates analytical views and audit tables
    - Performs complex SQL transformations
    - Prepares data for comparison
