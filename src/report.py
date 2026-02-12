@@ -406,10 +406,18 @@ def generate_report_md(bene_res, claims_res, six_sigma_res, financial_impact_res
         if bene_res['missing_count'] > 100:
             recommendations.append(f"**DATA LOSS**: {bene_res['missing_count']:,} beneficiaries missing in new system. "
                                  f"Verify ETL completeness and investigate potential data loss.")
+
+        if bene_res['bene_records_with_discrepancies'] > 1000:
+            recommendations.append(f"**DATA DISCREPANCIES**: {bene_res['bene_records_with_discrepancies']:,} beneficiaries data discrepancies in new system. "
+                                 f"Review ingestion logs and verify source-to-target mapping at the field level.")
         
         if claims_res['missing_claims_count'] > 1000:
             recommendations.append(f"**DATA LOSS**: {claims_res['missing_claims_count']:,} claims missing in new system. "
                                  f"Review ingestion logs and verify source-to-target mapping.")
+
+        if claims_res['claim_records_with_discrepancies'] > 1000:
+            recommendations.append(f"**DATA DISCREPANCIES**: {claims_res['claim_records_with_discrepancies']:,} claims data discrepancies in new system. "
+                                 f"Review ingestion logs and verify source-to-target mapping at the field level.")
         
         # Output recommendations
         for i, rec in enumerate(recommendations, 1):
@@ -420,12 +428,18 @@ def generate_report_md(bene_res, claims_res, six_sigma_res, financial_impact_res
         f.write("## Conclusion\n\n")
         
         overall_sigma_avg = six_sigma_overall['SIGMA_LEVEL'].mean()
-        if overall_sigma_avg >= 4.0:
+        if overall_sigma_avg >= 6.0:
+            f.write("The migration demonstrates **world-class quality** with an average sigma level of {:.2f}σ. ".format(overall_sigma_avg))
+            f.write("No remedial action required.\n\n")
+        elif overall_sigma_avg >= 5.0:
+            f.write("The migration demonstrates **excellent overall quality** with an average sigma level of {:.2f}σ. ".format(overall_sigma_avg))
+            f.write("Little remedial action required depending on severity of identified discrepancies.\n\n")
+        elif overall_sigma_avg >= 4.0:
             f.write("The migration demonstrates **good overall quality** with an average sigma level of {:.2f}σ. ".format(overall_sigma_avg))
-            f.write("However, address the identified discrepancies before final production cutover.\n\n")
+            f.write("Remedial action required.\n\n")
         elif overall_sigma_avg >= 3.0:
             f.write("The migration shows **acceptable quality** with an average sigma level of {:.2f}σ, ".format(overall_sigma_avg))
-            f.write("but significant improvements are needed in specific areas before production deployment.\n\n")
+            f.write("however, significant improvements are needed in specific areas before production deployment.\n\n")
         else:
             f.write("The migration quality is **below acceptable standards** with an average sigma level of {:.2f}σ. ".format(overall_sigma_avg))
             f.write("**DO NOT PROCEED** with production cutover until critical issues are resolved.\n\n")

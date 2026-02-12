@@ -11,6 +11,7 @@ from src.ingest import run_ingestion
 from src.transform import main as run_transform
 from src.compare import run_comparison, compare_beneficiaries, compare_claims, calc_six_sigma, calc_financial_impact
 from src.report import generate_report_md
+from scripts.validate_ingestion import validate as run_validation
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -19,9 +20,10 @@ def main():
     parser = argparse.ArgumentParser(description="Data Engineer Take-Home Assessment Pipeline")
     parser.add_argument("--init-db", action="store_true", help="Initialize the database tables")
     parser.add_argument("--ingest", action="store_true", help="Run data ingestion")
+    parser.add_argument("--validate", action="store_true", help="Validate ingestion (run after --ingest, before transformation)")
     parser.add_argument("--compare", action="store_true", help="Run data comparison")
     parser.add_argument("--report", action="store_true", help="Generate report")
-    parser.add_argument("--all", action="store_true", help="Run full pipeline (init, ingest, compare, report)")
+    parser.add_argument("--all", action="store_true", help="Run full pipeline (init, ingest, validate, transform, compare, report)")
     
     args = parser.parse_args()
     
@@ -36,7 +38,14 @@ def main():
     if args.all or args.ingest:
         logger.info("Running data ingestion...")
         run_ingestion()
+    
+    if args.all or args.validate:
+        logger.info("Validating data ingestion...")
+        run_validation()
+        logger.info("✅ Validation complete")
         
+    # Only run transformation if we've completed ingestion (and optionally validation)
+    if args.all or (not args.validate and args.ingest):
         # Automatically run transformation after ingestion
         logger.info("Running data transformation (creating views and audit tables)...")
         run_transform()

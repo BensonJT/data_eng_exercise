@@ -1,8 +1,12 @@
 import sys
 import os
 import pandas as pd
+from dotenv import load_dotenv
 from sqlalchemy import text
 import logging
+
+# Load environment variables
+load_dotenv()
 
 # Add project root to python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -33,13 +37,23 @@ def get_csv_sum(file_paths, column_name):
 def validate():
     logger.info("Starting validation...")
     
+    # Get data directories from environment variables
+    source_data_dir = os.getenv('SOURCE_DATA_DIR')
+    new_data_dir = os.getenv('NEW_DATA_DIR')
+    
+    if not source_data_dir or not new_data_dir:
+        raise ValueError(
+            "SOURCE_DATA_DIR and NEW_DATA_DIR environment variables must be set. "
+            "Please configure .env file."
+        )
+    
     validations = [
         {
             "table": "src_beneficiary_summary",
             "files": [
-                "/mnt/e/Data Eng Exercise/source/DE1_0_2008_Beneficiary_Summary_File_Sample_1.csv",
-                "/mnt/e/Data Eng Exercise/source/DE1_0_2009_Beneficiary_Summary_File_Sample_1.csv",
-                "/mnt/e/Data Eng Exercise/source/DE1_0_2010_Beneficiary_Summary_File_Sample_1.csv"
+                os.path.join(source_data_dir, "DE1_0_2008_Beneficiary_Summary_File_Sample_1.csv"),
+                os.path.join(source_data_dir, "DE1_0_2009_Beneficiary_Summary_File_Sample_1.csv"),
+                os.path.join(source_data_dir, "DE1_0_2010_Beneficiary_Summary_File_Sample_1.csv")
             ],
             "column": "BENE_HI_CVRAGE_TOT_MONS",
             "desc": "Source Beneficiary Coverage Months"
@@ -47,9 +61,9 @@ def validate():
         {
             "table": "new_beneficiary_summary",
             "files": [
-                "/mnt/e/Data Eng Exercise/new/DE1_0_2008_Beneficiary_Summary_File_Sample_1_NEWSYSTEM.csv",
-                "/mnt/e/Data Eng Exercise/new/DE1_0_2009_Beneficiary_Summary_File_Sample_1_NEWSYSTEM.csv",
-                "/mnt/e/Data Eng Exercise/new/DE1_0_2010_Beneficiary_Summary_File_Sample_1_NEWSYSTEM.csv"
+                os.path.join(new_data_dir, "DE1_0_2008_Beneficiary_Summary_File_Sample_1_NEWSYSTEM.csv"),
+                os.path.join(new_data_dir, "DE1_0_2009_Beneficiary_Summary_File_Sample_1_NEWSYSTEM.csv"),
+                os.path.join(new_data_dir, "DE1_0_2010_Beneficiary_Summary_File_Sample_1_NEWSYSTEM.csv")
             ],
             "column": "BENE_HI_CVRAGE_TOT_MONS",
             "desc": "New Beneficiary Coverage Months"
@@ -57,8 +71,8 @@ def validate():
         {
             "table": "src_carrier_claims",
             "files": [
-                "/mnt/e/Data Eng Exercise/source/DE1_0_2008_to_2010_Carrier_Claims_Sample_1A.csv",
-                "/mnt/e/Data Eng Exercise/source/DE1_0_2008_to_2010_Carrier_Claims_Sample_1B.csv"
+                os.path.join(source_data_dir, "DE1_0_2008_to_2010_Carrier_Claims_Sample_1A.csv"),
+                os.path.join(source_data_dir, "DE1_0_2008_to_2010_Carrier_Claims_Sample_1B.csv")
             ],
              # Some CSVs might have slightly different headers, but usually consistent in this dataset
             "column": "LINE_NCH_PMT_AMT_1",
@@ -67,8 +81,8 @@ def validate():
         {
             "table": "new_carrier_claims",
             "files": [
-                "/mnt/e/Data Eng Exercise/new/DE1_0_2008_to_2010_Carrier_Claims_Sample_1A_NEWSYSTEM.csv",
-                "/mnt/e/Data Eng Exercise/new/DE1_0_2008_to_2010_Carrier_Claims_Sample_1B_NEWSYSTEM.csv"
+                os.path.join(new_data_dir, "DE1_0_2008_to_2010_Carrier_Claims_Sample_1A_NEWSYSTEM.csv"),
+                os.path.join(new_data_dir, "DE1_0_2008_to_2010_Carrier_Claims_Sample_1B_NEWSYSTEM.csv")
             ],
             "column": "LINE_NCH_PMT_AMT_1",
             "desc": "New Carrier Claims Payment Amount (Line 1)"
