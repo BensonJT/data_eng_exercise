@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def main():
+    '''
     logger.info("Loading lookup tables...")
     
     # Load lookup tables BEFORE running SQL transformations
@@ -40,8 +41,7 @@ def main():
         logger.error(f"Error ingesting labels: {e}")
         raise
     
-    logger.info("Starting SQL transformations...")
-    
+    logger.info("Starting Phase 1 SQL transformations.")
     sql_script = """CREATE OR REPLACE FUNCTION sigma_level(p_yield) AS (
             -- This is a standard approximation for the Inverse Normal Distribution
             -- combined with your 1.5 Sigma Shift
@@ -74,9 +74,16 @@ def main():
             'carrier_claims',
             (SELECT COUNT(*) FROM src_carrier_claims),
             (SELECT COUNT(*) FROM new_carrier_claims),
-            (SELECT COUNT(*) FROM new_carrier_claims) - (SELECT COUNT(*) FROM src_carrier_claims) AS diff;
+            (SELECT COUNT(*) FROM new_carrier_claims) - (SELECT COUNT(*) FROM src_carrier_claims) AS diff;"""
+    try:
+        execute_sql_script(sql_script)
+        logger.info("✅ Phase 1 SQL transformations completed successfully")
+    except Exception as e:
+        logger.error(f"Error running Phase 1 SQL transformations: {e}")
+        raise
 
-        /*BENEFICIARY DIFFERENCES*/
+    logger.info("Starting Phase 2 SQL transformations.")
+    sql_script = """/*BENEFICIARY DIFFERENCES*/
 
         CREATE OR REPLACE VIEW vw_beneficiary_errors AS
         SELECT
@@ -470,107 +477,16 @@ def main():
         CROSS JOIN UNNEST(metrics)
         GROUP BY unnest.metric_name
         ORDER BY total_abs_delta DESC;
-        ANALYZE audit_beneficiary_financial_fields;
+        ANALYZE audit_beneficiary_financial_fields;"""
+    try:
+        execute_sql_script(sql_script)
+        logger.info("✅ Phase 2 SQL transformations completed successfully")
+    except Exception as e:
+        logger.error(f"Error running Phase 2 SQL transformations: {e}")
+        raise'''
 
-
-        /*CLAIM DIFFERENCES*/
-
-        DROP VIEW IF EXISTS vw_claim_mismatches;
-        CREATE VIEW vw_claim_mismatches AS
-        SELECT
-            s.clm_id AS CLM_ID
-            ,'Error: Claim Missing in New File' as FINDING
-        FROM
-            src_carrier_claims s
-        LEFT JOIN new_carrier_claims n ON
-            s.clm_id = n.clm_id
-        WHERE
-            n.clm_id IS NULL
-        UNION 
-        SELECT
-            n.clm_id AS CLM_ID
-            ,'Error: Claim Present in New File, Not in Original File' as FINDING
-        FROM
-            new_carrier_claims n
-        LEFT JOIN src_carrier_claims s ON
-            n.clm_id = s.clm_id
-        WHERE
-            s.clm_id IS NULL;
-
-        -- This query calculates the "True" Payment for Line 1 using the business rules
-        -- and compares it to the Source to see if the migration actually failed.
-        DROP VIEW IF EXISTS vw_claim_line_nch_pmt_amt_1_differences;
-        CREATE OR REPLACE VIEW vw_claim_line_nch_pmt_amt_1_differences AS
-        WITH combined_claims AS (
-            SELECT 
-                COALESCE(s.CLM_ID, n.CLM_ID) AS CLM_ID,
-                COALESCE(s.DESYNPUF_ID, n.DESYNPUF_ID) AS BENE_ID,
-                s.LINE_NCH_PMT_AMT_1 AS src_pmt,
-                n.LINE_NCH_PMT_AMT_1 AS new_pmt,
-                n.LINE_PRCSG_IND_CD_1 AS processing_ind,
-                n.LINE_ALOWD_CHRG_AMT_1 AS allowed_amt,
-                COALESCE(s.CLM_FROM_DT, n.CLM_FROM_DT) AS CLM_FROM_DT,
-                CASE 
-                    WHEN s.CLM_ID IS NOT NULL AND n.CLM_ID IS NOT NULL THEN 'Matched'
-                    WHEN s.CLM_ID IS NOT NULL AND n.CLM_ID IS NULL THEN 'Src Only'
-                    WHEN s.CLM_ID IS NULL AND n.CLM_ID IS NOT NULL THEN 'New Only'
-                END AS record_status
-            FROM src_carrier_claims s
-            FULL OUTER JOIN new_carrier_claims n ON s.CLM_ID = n.CLM_ID
-        )
-        SELECT 
-            c.CLM_ID,
-            c.record_status,
-            -- Translate Code to Name: Priority sb, then nb, then fallback to 'Unknown'
-            COALESCE(ls_sb.name, ls_nb.name, 'Unknown/Orphan') AS STATE_NAME,
-            c.CLM_FROM_DT,
-            COALESCE(c.src_pmt, 0) AS src_pmt,
-            COALESCE(c.new_pmt, 0) AS new_pmt,
-            c.processing_ind,
-            c.allowed_amt,
-            CASE 
-                WHEN c.processing_ind = 'A' THEN 'Valid'
-                WHEN c.processing_ind IN ('R', 'S') AND c.allowed_amt > 0 THEN 'Valid'
-                ELSE 'Denied/Invalid'
-            END AS business_rule_status,
-            (COALESCE(c.src_pmt, 0) - COALESCE(c.new_pmt, 0)) AS variance
-        FROM combined_claims c
-        LEFT JOIN src_beneficiary_summary sb ON c.BENE_ID = sb.DESYNPUF_ID
-        LEFT JOIN new_beneficiary_summary nb ON c.BENE_ID = nb.DESYNPUF_ID
-        -- Joins to your Lookup Table
-        LEFT JOIN lookup_state ls_sb ON sb.SP_STATE_CODE = ls_sb.code
-        LEFT JOIN lookup_state ls_nb ON nb.SP_STATE_CODE = ls_nb.code
-        WHERE business_rule_status = 'Valid' 
-        AND COALESCE(c.src_pmt, 0) <> COALESCE(c.new_pmt, 0);
-
-        CREATE OR REPLACE TABLE carrier_claims_orphans as 
-        WITH KEYS AS (
-            SELECT DISTINCT
-                DESYNPUF_ID
-                ,CLM_ID
-                ,CLM_FROM_DT
-                ,CLM_THRU_DT
-            FROM 
-                data_eng.main.src_carrier_claims
-        )
-        SELECT 
-            n.* 
-        FROM 
-            data_eng.main.new_carrier_claims n
-        FULL OUTER JOIN 
-            KEYS k 
-        ON
-            n.DESYNPUF_ID = k.DESYNPUF_ID
-            AND n.CLM_ID = k.CLM_ID
-            AND n.CLM_FROM_DT = k.CLM_FROM_DT
-            AND n.CLM_THRU_DT = k.CLM_THRU_DT
-        WHERE 
-            k.DESYNPUF_ID IS NULL
-            OR k.CLM_ID IS NULL
-            OR k.CLM_FROM_DT IS NULL
-            OR k.CLM_THRU_DT IS NULL;
-        ANALYZE carrier_claims_orphans;
-
+    logger.info("Starting Phase 3 SQL transformations.")
+    sql_script = """
         DROP TABLE IF EXISTS audit_carrier_claims;
         CREATE TABLE audit_carrier_claims AS
         WITH KEYS AS (
@@ -1032,10 +948,1012 @@ def main():
             FROM
                 keys k 
         LEFT JOIN src_ s ON k.DESYNPUF_ID = s.DESYNPUF_ID AND k.CLM_ID = s.CLM_ID AND k.CLM_FROM_DT = s.CLM_FROM_DT AND k.CLM_THRU_DT = s.CLM_THRU_DT
-        LEFT JOIN new_ n ON k.DESYNPUF_ID = n.DESYNPUF_ID AND k.CLM_ID = n.CLM_ID AND k.CLM_FROM_DT = n.CLM_FROM_DT AND k.CLM_THRU_DT = n.CLM_THRU_DT;
-        CREATE INDEX idx_audit_carrier_claims_keys ON audit_carrier_claims(DESYNPUF_ID, CLM_ID, CLM_FROM_DT, CLM_THRU_DT);
-        ANALYZE audit_carrier_claims;
+        LEFT JOIN new_ n ON k.DESYNPUF_ID = n.DESYNPUF_ID AND k.CLM_ID = n.CLM_ID AND k.CLM_FROM_DT = n.CLM_FROM_DT AND k.CLM_THRU_DT = n.CLM_THRU_DT;"""
+    try:
+        execute_sql_script(sql_script)
+        logger.info("✅ Phase 3 SQL transformations completed successfully")
+    except Exception as e:
+        logger.error(f"Error running Phase 3 SQL transformations: {e}")
+        logger.info("Starting Phase 3a SQL transformations.")
+        sql_script = """/*CLAIM DIFFERENCES*/
 
+            DROP VIEW IF EXISTS vw_claim_mismatches;
+            CREATE VIEW vw_claim_mismatches AS
+            SELECT
+                s.clm_id AS CLM_ID
+                ,'Error: Claim Missing in New File' as FINDING
+            FROM
+                src_carrier_claims s
+            LEFT JOIN new_carrier_claims n ON
+                s.clm_id = n.clm_id
+            WHERE
+                n.clm_id IS NULL
+            UNION 
+            SELECT
+                n.clm_id AS CLM_ID
+                ,'Error: Claim Present in New File, Not in Original File' as FINDING
+            FROM
+                new_carrier_claims n
+            LEFT JOIN src_carrier_claims s ON
+                n.clm_id = s.clm_id
+            WHERE
+                s.clm_id IS NULL;
+
+            -- This query calculates the "True" Payment for Line 1 using the business rules
+            -- and compares it to the Source to see if the migration actually failed.
+            DROP VIEW IF EXISTS vw_claim_line_nch_pmt_amt_1_differences;
+            CREATE OR REPLACE VIEW vw_claim_line_nch_pmt_amt_1_differences AS
+            WITH combined_claims AS (
+                SELECT 
+                    COALESCE(s.CLM_ID, n.CLM_ID) AS CLM_ID,
+                    COALESCE(s.DESYNPUF_ID, n.DESYNPUF_ID) AS BENE_ID,
+                    s.LINE_NCH_PMT_AMT_1 AS src_pmt,
+                    n.LINE_NCH_PMT_AMT_1 AS new_pmt,
+                    n.LINE_PRCSG_IND_CD_1 AS processing_ind,
+                    n.LINE_ALOWD_CHRG_AMT_1 AS allowed_amt,
+                    COALESCE(s.CLM_FROM_DT, n.CLM_FROM_DT) AS CLM_FROM_DT,
+                    CASE 
+                        WHEN s.CLM_ID IS NOT NULL AND n.CLM_ID IS NOT NULL THEN 'Matched'
+                        WHEN s.CLM_ID IS NOT NULL AND n.CLM_ID IS NULL THEN 'Src Only'
+                        WHEN s.CLM_ID IS NULL AND n.CLM_ID IS NOT NULL THEN 'New Only'
+                    END AS record_status
+                FROM src_carrier_claims s
+                FULL OUTER JOIN new_carrier_claims n ON s.CLM_ID = n.CLM_ID
+            )
+            SELECT 
+                c.CLM_ID,
+                c.record_status,
+                -- Translate Code to Name: Priority sb, then nb, then fallback to 'Unknown'
+                COALESCE(ls_sb.name, ls_nb.name, 'Unknown/Orphan') AS STATE_NAME,
+                c.CLM_FROM_DT,
+                COALESCE(c.src_pmt, 0) AS src_pmt,
+                COALESCE(c.new_pmt, 0) AS new_pmt,
+                c.processing_ind,
+                c.allowed_amt,
+                CASE 
+                    WHEN c.processing_ind = 'A' THEN 'Valid'
+                    WHEN c.processing_ind IN ('R', 'S') AND c.allowed_amt > 0 THEN 'Valid'
+                    ELSE 'Denied/Invalid'
+                END AS business_rule_status,
+                (COALESCE(c.src_pmt, 0) - COALESCE(c.new_pmt, 0)) AS variance
+            FROM combined_claims c
+            LEFT JOIN src_beneficiary_summary sb ON c.BENE_ID = sb.DESYNPUF_ID
+            LEFT JOIN new_beneficiary_summary nb ON c.BENE_ID = nb.DESYNPUF_ID
+            -- Joins to your Lookup Table
+            LEFT JOIN lookup_state ls_sb ON sb.SP_STATE_CODE = ls_sb.code
+            LEFT JOIN lookup_state ls_nb ON nb.SP_STATE_CODE = ls_nb.code
+            WHERE business_rule_status = 'Valid' 
+            AND COALESCE(c.src_pmt, 0) <> COALESCE(c.new_pmt, 0);
+
+            CREATE OR REPLACE TABLE carrier_claims_orphans as 
+            WITH KEYS AS (
+                SELECT DISTINCT
+                    DESYNPUF_ID
+                    ,CLM_ID
+                    ,CLM_FROM_DT
+                    ,CLM_THRU_DT
+                FROM 
+                    data_eng.main.src_carrier_claims
+            )
+            SELECT 
+                n.* 
+            FROM 
+                data_eng.main.new_carrier_claims n
+            FULL OUTER JOIN 
+                KEYS k 
+            ON
+                n.DESYNPUF_ID = k.DESYNPUF_ID
+                AND n.CLM_ID = k.CLM_ID
+                AND n.CLM_FROM_DT = k.CLM_FROM_DT
+                AND n.CLM_THRU_DT = k.CLM_THRU_DT
+            WHERE 
+                k.DESYNPUF_ID IS NULL
+                OR k.CLM_ID IS NULL
+                OR k.CLM_FROM_DT IS NULL
+                OR k.CLM_THRU_DT IS NULL;
+            ANALYZE carrier_claims_orphans;"""
+
+        try:
+            execute_sql_script(sql_script)
+            logger.info("✅ Phase 3a SQL transformations completed successfully")
+        except Exception as e:
+            logger.error(f"Error running Phase 3a SQL transformations: {e}")
+            raise
+
+        logger.info("Starting Phase 3b SQL transformations.")
+        sql_script = """
+            DROP TABLE IF EXISTS audit_carrier_keys;
+            CREATE TABLE audit_carrier_keys AS
+            WITH KEYS AS (
+                SELECT DISTINCT
+                    DESYNPUF_ID,
+                    CLM_ID,
+                    CLM_FROM_DT,
+                    CLM_THRU_DT
+                FROM data_eng.main.src_carrier_claims
+                UNION
+                SELECT DISTINCT
+                    DESYNPUF_ID,
+                    CLM_ID,
+                    CLM_FROM_DT,
+                    CLM_THRU_DT
+                FROM data_eng.main.new_carrier_claims
+            )
+            SELECT * FROM KEYS;
+            CREATE INDEX idx_audit_carrier_keys
+                ON audit_carrier_keys (DESYNPUF_ID, CLM_ID, CLM_FROM_DT, CLM_THRU_DT);
+            ANALYZE audit_carrier_keys;
+
+            DROP TABLE IF EXISTS audit_carrier_src;
+            CREATE TABLE audit_carrier_src AS
+            SELECT
+                DESYNPUF_ID,
+                CLM_ID,
+                CLM_FROM_DT,
+                CLM_THRU_DT,
+                ICD9_DGNS_CD_1,
+                ICD9_DGNS_CD_2,
+                ICD9_DGNS_CD_3,
+                ICD9_DGNS_CD_4,
+                ICD9_DGNS_CD_5,
+                ICD9_DGNS_CD_6,
+                ICD9_DGNS_CD_7,
+                ICD9_DGNS_CD_8,
+                PRF_PHYSN_NPI_1,
+                PRF_PHYSN_NPI_2,
+                PRF_PHYSN_NPI_3,
+                PRF_PHYSN_NPI_4,
+                PRF_PHYSN_NPI_5,
+                PRF_PHYSN_NPI_6,
+                PRF_PHYSN_NPI_7,
+                PRF_PHYSN_NPI_8,
+                PRF_PHYSN_NPI_9,
+                PRF_PHYSN_NPI_10,
+                PRF_PHYSN_NPI_11,
+                PRF_PHYSN_NPI_12,
+                PRF_PHYSN_NPI_13,
+                TAX_NUM_1,
+                TAX_NUM_2,
+                TAX_NUM_3,
+                TAX_NUM_4,
+                TAX_NUM_5,
+                TAX_NUM_6,
+                TAX_NUM_7,
+                TAX_NUM_8,
+                TAX_NUM_9,
+                TAX_NUM_10,
+                TAX_NUM_11,
+                TAX_NUM_12,
+                TAX_NUM_13,
+                HCPCS_CD_1,
+                HCPCS_CD_2,
+                HCPCS_CD_3,
+                HCPCS_CD_4,
+                HCPCS_CD_5,
+                HCPCS_CD_6,
+                HCPCS_CD_7,
+                HCPCS_CD_8,
+                HCPCS_CD_9,
+                HCPCS_CD_10,
+                HCPCS_CD_11,
+                HCPCS_CD_12,
+                HCPCS_CD_13,
+                LINE_NCH_PMT_AMT_1,
+                LINE_NCH_PMT_AMT_2,
+                LINE_NCH_PMT_AMT_3,
+                LINE_NCH_PMT_AMT_4,
+                LINE_NCH_PMT_AMT_5,
+                LINE_NCH_PMT_AMT_6,
+                LINE_NCH_PMT_AMT_7,
+                LINE_NCH_PMT_AMT_8,
+                LINE_NCH_PMT_AMT_9,
+                LINE_NCH_PMT_AMT_10,
+                LINE_NCH_PMT_AMT_11,
+                LINE_NCH_PMT_AMT_12,
+                LINE_NCH_PMT_AMT_13,
+                LINE_BENE_PTB_DDCTBL_AMT_1,
+                LINE_BENE_PTB_DDCTBL_AMT_2,
+                LINE_BENE_PTB_DDCTBL_AMT_3,
+                LINE_BENE_PTB_DDCTBL_AMT_4,
+                LINE_BENE_PTB_DDCTBL_AMT_5,
+                LINE_BENE_PTB_DDCTBL_AMT_6,
+                LINE_BENE_PTB_DDCTBL_AMT_7,
+                LINE_BENE_PTB_DDCTBL_AMT_8,
+                LINE_BENE_PTB_DDCTBL_AMT_9,
+                LINE_BENE_PTB_DDCTBL_AMT_10,
+                LINE_BENE_PTB_DDCTBL_AMT_11,
+                LINE_BENE_PTB_DDCTBL_AMT_12,
+                LINE_BENE_PTB_DDCTBL_AMT_13,
+                LINE_BENE_PRMRY_PYR_PD_AMT_1,
+                LINE_BENE_PRMRY_PYR_PD_AMT_2,
+                LINE_BENE_PRMRY_PYR_PD_AMT_3,
+                LINE_BENE_PRMRY_PYR_PD_AMT_4,
+                LINE_BENE_PRMRY_PYR_PD_AMT_5,
+                LINE_BENE_PRMRY_PYR_PD_AMT_6,
+                LINE_BENE_PRMRY_PYR_PD_AMT_7,
+                LINE_BENE_PRMRY_PYR_PD_AMT_8,
+                LINE_BENE_PRMRY_PYR_PD_AMT_9,
+                LINE_BENE_PRMRY_PYR_PD_AMT_10,
+                LINE_BENE_PRMRY_PYR_PD_AMT_11,
+                LINE_BENE_PRMRY_PYR_PD_AMT_12,
+                LINE_BENE_PRMRY_PYR_PD_AMT_13,
+                LINE_COINSRNC_AMT_1,
+                LINE_COINSRNC_AMT_2,
+                LINE_COINSRNC_AMT_3,
+                LINE_COINSRNC_AMT_4,
+                LINE_COINSRNC_AMT_5,
+                LINE_COINSRNC_AMT_6,
+                LINE_COINSRNC_AMT_7,
+                LINE_COINSRNC_AMT_8,
+                LINE_COINSRNC_AMT_9,
+                LINE_COINSRNC_AMT_10,
+                LINE_COINSRNC_AMT_11,
+                LINE_COINSRNC_AMT_12,
+                LINE_COINSRNC_AMT_13,
+                LINE_ALOWD_CHRG_AMT_1,
+                LINE_ALOWD_CHRG_AMT_2,
+                LINE_ALOWD_CHRG_AMT_3,
+                LINE_ALOWD_CHRG_AMT_4,
+                LINE_ALOWD_CHRG_AMT_5,
+                LINE_ALOWD_CHRG_AMT_6,
+                LINE_ALOWD_CHRG_AMT_7,
+                LINE_ALOWD_CHRG_AMT_8,
+                LINE_ALOWD_CHRG_AMT_9,
+                LINE_ALOWD_CHRG_AMT_10,
+                LINE_ALOWD_CHRG_AMT_11,
+                LINE_ALOWD_CHRG_AMT_12,
+                LINE_ALOWD_CHRG_AMT_13,
+                LINE_PRCSG_IND_CD_1,
+                LINE_PRCSG_IND_CD_2,
+                LINE_PRCSG_IND_CD_3,
+                LINE_PRCSG_IND_CD_4,
+                LINE_PRCSG_IND_CD_5,
+                LINE_PRCSG_IND_CD_6,
+                LINE_PRCSG_IND_CD_7,
+                LINE_PRCSG_IND_CD_8,
+                LINE_PRCSG_IND_CD_9,
+                LINE_PRCSG_IND_CD_10,
+                LINE_PRCSG_IND_CD_11,
+                LINE_PRCSG_IND_CD_12,
+                LINE_PRCSG_IND_CD_13,
+                LINE_ICD9_DGNS_CD_1,
+                LINE_ICD9_DGNS_CD_2,
+                LINE_ICD9_DGNS_CD_3,
+                LINE_ICD9_DGNS_CD_4,
+                LINE_ICD9_DGNS_CD_5,
+                LINE_ICD9_DGNS_CD_6,
+                LINE_ICD9_DGNS_CD_7,
+                LINE_ICD9_DGNS_CD_8,
+                LINE_ICD9_DGNS_CD_9,
+                LINE_ICD9_DGNS_CD_10,
+                LINE_ICD9_DGNS_CD_11,
+                LINE_ICD9_DGNS_CD_12,
+                LINE_ICD9_DGNS_CD_13
+            FROM data_eng.main.src_carrier_claims;
+            CREATE INDEX idx_audit_carrier_src_keys
+                ON audit_carrier_src (DESYNPUF_ID, CLM_ID, CLM_FROM_DT, CLM_THRU_DT);
+            ANALYZE audit_carrier_src;
+
+            DROP TABLE IF EXISTS audit_carrier_new;
+            CREATE TABLE audit_carrier_new AS
+            SELECT
+                DESYNPUF_ID,
+                CLM_ID,
+                CLM_FROM_DT,
+                CLM_THRU_DT,
+                -- same column list as audit_carrier_src
+                ICD9_DGNS_CD_1,
+                ICD9_DGNS_CD_2,
+                ICD9_DGNS_CD_3,
+                ICD9_DGNS_CD_4,
+                ICD9_DGNS_CD_5,
+                ICD9_DGNS_CD_6,
+                ICD9_DGNS_CD_7,
+                ICD9_DGNS_CD_8,
+                PRF_PHYSN_NPI_1,
+                PRF_PHYSN_NPI_2,
+                PRF_PHYSN_NPI_3,
+                PRF_PHYSN_NPI_4,
+                PRF_PHYSN_NPI_5,
+                PRF_PHYSN_NPI_6,
+                PRF_PHYSN_NPI_7,
+                PRF_PHYSN_NPI_8,
+                PRF_PHYSN_NPI_9,
+                PRF_PHYSN_NPI_10,
+                PRF_PHYSN_NPI_11,
+                PRF_PHYSN_NPI_12,
+                PRF_PHYSN_NPI_13,
+                TAX_NUM_1,
+                TAX_NUM_2,
+                TAX_NUM_3,
+                TAX_NUM_4,
+                TAX_NUM_5,
+                TAX_NUM_6,
+                TAX_NUM_7,
+                TAX_NUM_8,
+                TAX_NUM_9,
+                TAX_NUM_10,
+                TAX_NUM_11,
+                TAX_NUM_12,
+                TAX_NUM_13,
+                HCPCS_CD_1,
+                HCPCS_CD_2,
+                HCPCS_CD_3,
+                HCPCS_CD_4,
+                HCPCS_CD_5,
+                HCPCS_CD_6,
+                HCPCS_CD_7,
+                HCPCS_CD_8,
+                HCPCS_CD_9,
+                HCPCS_CD_10,
+                HCPCS_CD_11,
+                HCPCS_CD_12,
+                HCPCS_CD_13,
+                LINE_NCH_PMT_AMT_1,
+                LINE_NCH_PMT_AMT_2,
+                LINE_NCH_PMT_AMT_3,
+                LINE_NCH_PMT_AMT_4,
+                LINE_NCH_PMT_AMT_5,
+                LINE_NCH_PMT_AMT_6,
+                LINE_NCH_PMT_AMT_7,
+                LINE_NCH_PMT_AMT_8,
+                LINE_NCH_PMT_AMT_9,
+                LINE_NCH_PMT_AMT_10,
+                LINE_NCH_PMT_AMT_11,
+                LINE_NCH_PMT_AMT_12,
+                LINE_NCH_PMT_AMT_13,
+                LINE_BENE_PTB_DDCTBL_AMT_1,
+                LINE_BENE_PTB_DDCTBL_AMT_2,
+                LINE_BENE_PTB_DDCTBL_AMT_3,
+                LINE_BENE_PTB_DDCTBL_AMT_4,
+                LINE_BENE_PTB_DDCTBL_AMT_5,
+                LINE_BENE_PTB_DDCTBL_AMT_6,
+                LINE_BENE_PTB_DDCTBL_AMT_7,
+                LINE_BENE_PTB_DDCTBL_AMT_8,
+                LINE_BENE_PTB_DDCTBL_AMT_9,
+                LINE_BENE_PTB_DDCTBL_AMT_10,
+                LINE_BENE_PTB_DDCTBL_AMT_11,
+                LINE_BENE_PTB_DDCTBL_AMT_12,
+                LINE_BENE_PTB_DDCTBL_AMT_13,
+                LINE_BENE_PRMRY_PYR_PD_AMT_1,
+                LINE_BENE_PRMRY_PYR_PD_AMT_2,
+                LINE_BENE_PRMRY_PYR_PD_AMT_3,
+                LINE_BENE_PRMRY_PYR_PD_AMT_4,
+                LINE_BENE_PRMRY_PYR_PD_AMT_5,
+                LINE_BENE_PRMRY_PYR_PD_AMT_6,
+                LINE_BENE_PRMRY_PYR_PD_AMT_7,
+                LINE_BENE_PRMRY_PYR_PD_AMT_8,
+                LINE_BENE_PRMRY_PYR_PD_AMT_9,
+                LINE_BENE_PRMRY_PYR_PD_AMT_10,
+                LINE_BENE_PRMRY_PYR_PD_AMT_11,
+                LINE_BENE_PRMRY_PYR_PD_AMT_12,
+                LINE_BENE_PRMRY_PYR_PD_AMT_13,
+                LINE_COINSRNC_AMT_1,
+                LINE_COINSRNC_AMT_2,
+                LINE_COINSRNC_AMT_3,
+                LINE_COINSRNC_AMT_4,
+                LINE_COINSRNC_AMT_5,
+                LINE_COINSRNC_AMT_6,
+                LINE_COINSRNC_AMT_7,
+                LINE_COINSRNC_AMT_8,
+                LINE_COINSRNC_AMT_9,
+                LINE_COINSRNC_AMT_10,
+                LINE_COINSRNC_AMT_11,
+                LINE_COINSRNC_AMT_12,
+                LINE_COINSRNC_AMT_13,
+                LINE_ALOWD_CHRG_AMT_1,
+                LINE_ALOWD_CHRG_AMT_2,
+                LINE_ALOWD_CHRG_AMT_3,
+                LINE_ALOWD_CHRG_AMT_4,
+                LINE_ALOWD_CHRG_AMT_5,
+                LINE_ALOWD_CHRG_AMT_6,
+                LINE_ALOWD_CHRG_AMT_7,
+                LINE_ALOWD_CHRG_AMT_8,
+                LINE_ALOWD_CHRG_AMT_9,
+                LINE_ALOWD_CHRG_AMT_10,
+                LINE_ALOWD_CHRG_AMT_11,
+                LINE_ALOWD_CHRG_AMT_12,
+                LINE_ALOWD_CHRG_AMT_13,
+                LINE_PRCSG_IND_CD_1,
+                LINE_PRCSG_IND_CD_2,
+                LINE_PRCSG_IND_CD_3,
+                LINE_PRCSG_IND_CD_4,
+                LINE_PRCSG_IND_CD_5,
+                LINE_PRCSG_IND_CD_6,
+                LINE_PRCSG_IND_CD_7,
+                LINE_PRCSG_IND_CD_8,
+                LINE_PRCSG_IND_CD_9,
+                LINE_PRCSG_IND_CD_10,
+                LINE_PRCSG_IND_CD_11,
+                LINE_PRCSG_IND_CD_12,
+                LINE_PRCSG_IND_CD_13,
+                LINE_ICD9_DGNS_CD_1,
+                LINE_ICD9_DGNS_CD_2,
+                LINE_ICD9_DGNS_CD_3,
+                LINE_ICD9_DGNS_CD_4,
+                LINE_ICD9_DGNS_CD_5,
+                LINE_ICD9_DGNS_CD_6,
+                LINE_ICD9_DGNS_CD_7,
+                LINE_ICD9_DGNS_CD_8,
+                LINE_ICD9_DGNS_CD_9,
+                LINE_ICD9_DGNS_CD_10,
+                LINE_ICD9_DGNS_CD_11,
+                LINE_ICD9_DGNS_CD_12,
+                LINE_ICD9_DGNS_CD_13
+            FROM data_eng.main.new_carrier_claims;
+            CREATE INDEX idx_audit_carrier_new_keys
+                ON audit_carrier_new (DESYNPUF_ID, CLM_ID, CLM_FROM_DT, CLM_THRU_DT);
+            ANALYZE audit_carrier_new;"""
+        try:
+            execute_sql_script(sql_script)
+            logger.info("✅ Phase 3b SQL transformations completed successfully")
+        except Exception as e:
+            logger.error(f"Error running Phase 3b SQL transformations: {e}")
+            raise
+
+        logger.info("Starting Phase 3c1 SQL transformations.")
+        sql_script = """
+            DROP TABLE IF EXISTS audit_carrier_claims;
+            CREATE TABLE audit_carrier_claims AS
+            SELECT
+                DESYNPUF_ID,
+                CLM_ID,
+                CLM_FROM_DT,
+                CLM_THRU_DT
+            FROM audit_carrier_keys;
+            """
+        try:
+            execute_sql_script(sql_script)
+            logger.info("✅ Phase 3c1 SQL transformations completed successfully")
+        except Exception as e:
+            logger.error(f"Error running Phase 3c1 SQL transformations: {e}")
+            raise
+
+        logger.info("Starting Phase 3c2 SQL transformations.")
+        sql_script = """
+            -- Add columns
+            ALTER TABLE audit_carrier_claims ADD COLUMN CLM_FROM_DT_DIFF INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN CLM_THRU_DT_DIFF INTEGER;
+
+            ALTER TABLE audit_carrier_claims ADD COLUMN ICD9_DGNS_CD_1 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN ICD9_DGNS_CD_2 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN ICD9_DGNS_CD_3 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN ICD9_DGNS_CD_4 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN ICD9_DGNS_CD_5 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN ICD9_DGNS_CD_6 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN ICD9_DGNS_CD_7 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN ICD9_DGNS_CD_8 INTEGER;
+
+            -- Populate
+            UPDATE audit_carrier_claims t
+            SET
+                CLM_FROM_DT_DIFF = CASE WHEN COALESCE(s.CLM_FROM_DT, '') <> COALESCE(n.CLM_FROM_DT, '') THEN 1 ELSE 0 END,
+                CLM_THRU_DT_DIFF = CASE WHEN COALESCE(s.CLM_THRU_DT, '') <> COALESCE(n.CLM_THRU_DT, '') THEN 1 ELSE 0 END,
+                ICD9_DGNS_CD_1   = CASE WHEN COALESCE(s.ICD9_DGNS_CD_1, '') <> COALESCE(n.ICD9_DGNS_CD_1, '') THEN 1 ELSE 0 END,
+                ICD9_DGNS_CD_2   = CASE WHEN COALESCE(s.ICD9_DGNS_CD_2, '') <> COALESCE(n.ICD9_DGNS_CD_2, '') THEN 1 ELSE 0 END,
+                ICD9_DGNS_CD_3   = CASE WHEN COALESCE(s.ICD9_DGNS_CD_3, '') <> COALESCE(n.ICD9_DGNS_CD_3, '') THEN 1 ELSE 0 END,
+                ICD9_DGNS_CD_4   = CASE WHEN COALESCE(s.ICD9_DGNS_CD_4, '') <> COALESCE(n.ICD9_DGNS_CD_4, '') THEN 1 ELSE 0 END,
+                ICD9_DGNS_CD_5   = CASE WHEN COALESCE(s.ICD9_DGNS_CD_5, '') <> COALESCE(n.ICD9_DGNS_CD_5, '') THEN 1 ELSE 0 END,
+                ICD9_DGNS_CD_6   = CASE WHEN COALESCE(s.ICD9_DGNS_CD_6, '') <> COALESCE(n.ICD9_DGNS_CD_6, '') THEN 1 ELSE 0 END,
+                ICD9_DGNS_CD_7   = CASE WHEN COALESCE(s.ICD9_DGNS_CD_7, '') <> COALESCE(n.ICD9_DGNS_CD_7, '') THEN 1 ELSE 0 END,
+                ICD9_DGNS_CD_8   = CASE WHEN COALESCE(s.ICD9_DGNS_CD_8, '') <> COALESCE(n.ICD9_DGNS_CD_8, '') THEN 1 ELSE 0 END
+            FROM audit_carrier_src s
+            LEFT JOIN audit_carrier_new n
+            ON s.DESYNPUF_ID = n.DESYNPUF_ID
+            AND s.CLM_ID      = n.CLM_ID
+            AND s.CLM_FROM_DT = n.CLM_FROM_DT
+            AND s.CLM_THRU_DT = n.CLM_THRU_DT
+            WHERE t.DESYNPUF_ID = s.DESYNPUF_ID
+            AND t.CLM_ID      = s.CLM_ID
+            AND t.CLM_FROM_DT = s.CLM_FROM_DT
+            AND t.CLM_THRU_DT = s.CLM_THRU_DT;
+            """
+        try:
+            execute_sql_script(sql_script)
+            logger.info("✅ Phase 3c2 SQL transformations completed successfully")
+        except Exception as e:
+            logger.error(f"Error running Phase 3c2 SQL transformations: {e}")
+            raise
+
+        logger.info("Starting Phase 3c3 SQL transformations.")
+        sql_script = """
+            -- Add columns
+            ALTER TABLE audit_carrier_claims ADD COLUMN PRF_PHYSN_NPI_1  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN PRF_PHYSN_NPI_2  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN PRF_PHYSN_NPI_3  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN PRF_PHYSN_NPI_4  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN PRF_PHYSN_NPI_5  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN PRF_PHYSN_NPI_6  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN PRF_PHYSN_NPI_7  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN PRF_PHYSN_NPI_8  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN PRF_PHYSN_NPI_9  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN PRF_PHYSN_NPI_10 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN PRF_PHYSN_NPI_11 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN PRF_PHYSN_NPI_12 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN PRF_PHYSN_NPI_13 INTEGER;
+
+            -- Populate
+            UPDATE audit_carrier_claims t
+            SET
+                PRF_PHYSN_NPI_1  = CASE WHEN COALESCE(s.PRF_PHYSN_NPI_1,  '') <> COALESCE(n.PRF_PHYSN_NPI_1,  '') THEN 1 ELSE 0 END,
+                PRF_PHYSN_NPI_2  = CASE WHEN COALESCE(s.PRF_PHYSN_NPI_2,  '') <> COALESCE(n.PRF_PHYSN_NPI_2,  '') THEN 1 ELSE 0 END,
+                PRF_PHYSN_NPI_3  = CASE WHEN COALESCE(s.PRF_PHYSN_NPI_3,  '') <> COALESCE(n.PRF_PHYSN_NPI_3,  '') THEN 1 ELSE 0 END,
+                PRF_PHYSN_NPI_4  = CASE WHEN COALESCE(s.PRF_PHYSN_NPI_4,  '') <> COALESCE(n.PRF_PHYSN_NPI_4,  '') THEN 1 ELSE 0 END,
+                PRF_PHYSN_NPI_5  = CASE WHEN COALESCE(s.PRF_PHYSN_NPI_5,  '') <> COALESCE(n.PRF_PHYSN_NPI_5,  '') THEN 1 ELSE 0 END,
+                PRF_PHYSN_NPI_6  = CASE WHEN COALESCE(s.PRF_PHYSN_NPI_6,  '') <> COALESCE(n.PRF_PHYSN_NPI_6,  '') THEN 1 ELSE 0 END,
+                PRF_PHYSN_NPI_7  = CASE WHEN COALESCE(s.PRF_PHYSN_NPI_7,  '') <> COALESCE(n.PRF_PHYSN_NPI_7,  '') THEN 1 ELSE 0 END,
+                PRF_PHYSN_NPI_8  = CASE WHEN COALESCE(s.PRF_PHYSN_NPI_8,  '') <> COALESCE(n.PRF_PHYSN_NPI_8,  '') THEN 1 ELSE 0 END,
+                PRF_PHYSN_NPI_9  = CASE WHEN COALESCE(s.PRF_PHYSN_NPI_9,  '') <> COALESCE(n.PRF_PHYSN_NPI_9,  '') THEN 1 ELSE 0 END,
+                PRF_PHYSN_NPI_10 = CASE WHEN COALESCE(s.PRF_PHYSN_NPI_10, '') <> COALESCE(n.PRF_PHYSN_NPI_10, '') THEN 1 ELSE 0 END,
+                PRF_PHYSN_NPI_11 = CASE WHEN COALESCE(s.PRF_PHYSN_NPI_11, '') <> COALESCE(n.PRF_PHYSN_NPI_11, '') THEN 1 ELSE 0 END,
+                PRF_PHYSN_NPI_12 = CASE WHEN COALESCE(s.PRF_PHYSN_NPI_12, '') <> COALESCE(n.PRF_PHYSN_NPI_12, '') THEN 1 ELSE 0 END,
+                PRF_PHYSN_NPI_13 = CASE WHEN COALESCE(s.PRF_PHYSN_NPI_13, '') <> COALESCE(n.PRF_PHYSN_NPI_13, '') THEN 1 ELSE 0 END
+            FROM audit_carrier_src s
+            LEFT JOIN audit_carrier_new n
+            ON s.DESYNPUF_ID = n.DESYNPUF_ID
+            AND s.CLM_ID      = n.CLM_ID
+            AND s.CLM_FROM_DT = n.CLM_FROM_DT
+            AND s.CLM_THRU_DT = n.CLM_THRU_DT
+            WHERE t.DESYNPUF_ID = s.DESYNPUF_ID
+            AND t.CLM_ID      = s.CLM_ID
+            AND t.CLM_FROM_DT = s.CLM_FROM_DT
+            AND t.CLM_THRU_DT = s.CLM_THRU_DT;
+            """
+        try:
+            execute_sql_script(sql_script)
+            logger.info("✅ Phase 3c3 SQL transformations completed successfully")
+        except Exception as e:
+            logger.error(f"Error running Phase 3c3 SQL transformations: {e}")
+            raise
+
+        logger.info("Starting Phase 3c4 SQL transformations.")
+        sql_script = """
+            ALTER TABLE audit_carrier_claims ADD COLUMN TAX_NUM_1  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN TAX_NUM_2  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN TAX_NUM_3  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN TAX_NUM_4  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN TAX_NUM_5  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN TAX_NUM_6  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN TAX_NUM_7  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN TAX_NUM_8  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN TAX_NUM_9  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN TAX_NUM_10 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN TAX_NUM_11 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN TAX_NUM_12 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN TAX_NUM_13 INTEGER;
+
+            UPDATE audit_carrier_claims t
+            SET
+                TAX_NUM_1  = CASE WHEN COALESCE(s.TAX_NUM_1,  '') <> COALESCE(n.TAX_NUM_1,  '') THEN 1 ELSE 0 END,
+                TAX_NUM_2  = CASE WHEN COALESCE(s.TAX_NUM_2,  '') <> COALESCE(n.TAX_NUM_2,  '') THEN 1 ELSE 0 END,
+                TAX_NUM_3  = CASE WHEN COALESCE(s.TAX_NUM_3,  '') <> COALESCE(n.TAX_NUM_3,  '') THEN 1 ELSE 0 END,
+                TAX_NUM_4  = CASE WHEN COALESCE(s.TAX_NUM_4,  '') <> COALESCE(n.TAX_NUM_4,  '') THEN 1 ELSE 0 END,
+                TAX_NUM_5  = CASE WHEN COALESCE(s.TAX_NUM_5,  '') <> COALESCE(n.TAX_NUM_5,  '') THEN 1 ELSE 0 END,
+                TAX_NUM_6  = CASE WHEN COALESCE(s.TAX_NUM_6,  '') <> COALESCE(n.TAX_NUM_6,  '') THEN 1 ELSE 0 END,
+                TAX_NUM_7  = CASE WHEN COALESCE(s.TAX_NUM_7,  '') <> COALESCE(n.TAX_NUM_7,  '') THEN 1 ELSE 0 END,
+                TAX_NUM_8  = CASE WHEN COALESCE(s.TAX_NUM_8,  '') <> COALESCE(n.TAX_NUM_8,  '') THEN 1 ELSE 0 END,
+                TAX_NUM_9  = CASE WHEN COALESCE(s.TAX_NUM_9,  '') <> COALESCE(n.TAX_NUM_9,  '') THEN 1 ELSE 0 END,
+                TAX_NUM_10 = CASE WHEN COALESCE(s.TAX_NUM_10, '') <> COALESCE(n.TAX_NUM_10, '') THEN 1 ELSE 0 END,
+                TAX_NUM_11 = CASE WHEN COALESCE(s.TAX_NUM_11, '') <> COALESCE(n.TAX_NUM_11, '') THEN 1 ELSE 0 END,
+                TAX_NUM_12 = CASE WHEN COALESCE(s.TAX_NUM_12, '') <> COALESCE(n.TAX_NUM_12, '') THEN 1 ELSE 0 END,
+                TAX_NUM_13 = CASE WHEN COALESCE(s.TAX_NUM_13, '') <> COALESCE(n.TAX_NUM_13, '') THEN 1 ELSE 0 END
+            FROM audit_carrier_src s
+            LEFT JOIN audit_carrier_new n
+            ON s.DESYNPUF_ID = n.DESYNPUF_ID
+            AND s.CLM_ID      = n.CLM_ID
+            AND s.CLM_FROM_DT = n.CLM_FROM_DT
+            AND s.CLM_THRU_DT = n.CLM_THRU_DT
+            WHERE t.DESYNPUF_ID = s.DESYNPUF_ID
+            AND t.CLM_ID      = s.CLM_ID
+            AND t.CLM_FROM_DT = s.CLM_FROM_DT
+            AND t.CLM_THRU_DT = s.CLM_THRU_DT;
+            """
+        try:
+            execute_sql_script(sql_script)
+            logger.info("✅ Phase 3c4 SQL transformations completed successfully")
+        except Exception as e:
+            logger.error(f"Error running Phase 3c4 SQL transformations: {e}")
+            raise
+
+        logger.info("Starting Phase 3c5 SQL transformations.")
+        sql_script = """
+            ALTER TABLE audit_carrier_claims ADD COLUMN HCPCS_CD_1  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN HCPCS_CD_2  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN HCPCS_CD_3  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN HCPCS_CD_4  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN HCPCS_CD_5  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN HCPCS_CD_6  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN HCPCS_CD_7  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN HCPCS_CD_8  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN HCPCS_CD_9  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN HCPCS_CD_10 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN HCPCS_CD_11 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN HCPCS_CD_12 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN HCPCS_CD_13 INTEGER;
+
+            UPDATE audit_carrier_claims t
+            SET
+                HCPCS_CD_1  = CASE WHEN COALESCE(s.HCPCS_CD_1,  '') <> COALESCE(n.HCPCS_CD_1,  '') THEN 1 ELSE 0 END,
+                HCPCS_CD_2  = CASE WHEN COALESCE(s.HCPCS_CD_2,  '') <> COALESCE(n.HCPCS_CD_2,  '') THEN 1 ELSE 0 END,
+                HCPCS_CD_3  = CASE WHEN COALESCE(s.HCPCS_CD_3,  '') <> COALESCE(n.HCPCS_CD_3,  '') THEN 1 ELSE 0 END,
+                HCPCS_CD_4  = CASE WHEN COALESCE(s.HCPCS_CD_4,  '') <> COALESCE(n.HCPCS_CD_4,  '') THEN 1 ELSE 0 END,
+                HCPCS_CD_5  = CASE WHEN COALESCE(s.HCPCS_CD_5,  '') <> COALESCE(n.HCPCS_CD_5,  '') THEN 1 ELSE 0 END,
+                HCPCS_CD_6  = CASE WHEN COALESCE(s.HCPCS_CD_6,  '') <> COALESCE(n.HCPCS_CD_6,  '') THEN 1 ELSE 0 END,
+                HCPCS_CD_7  = CASE WHEN COALESCE(s.HCPCS_CD_7,  '') <> COALESCE(n.HCPCS_CD_7,  '') THEN 1 ELSE 0 END,
+                HCPCS_CD_8  = CASE WHEN COALESCE(s.HCPCS_CD_8,  '') <> COALESCE(n.HCPCS_CD_8,  '') THEN 1 ELSE 0 END,
+                HCPCS_CD_9  = CASE WHEN COALESCE(s.HCPCS_CD_9,  '') <> COALESCE(n.HCPCS_CD_9,  '') THEN 1 ELSE 0 END,
+                HCPCS_CD_10 = CASE WHEN COALESCE(s.HCPCS_CD_10, '') <> COALESCE(n.HCPCS_CD_10, '') THEN 1 ELSE 0 END,
+                HCPCS_CD_11 = CASE WHEN COALESCE(s.HCPCS_CD_11, '') <> COALESCE(n.HCPCS_CD_11, '') THEN 1 ELSE 0 END,
+                HCPCS_CD_12 = CASE WHEN COALESCE(s.HCPCS_CD_12, '') <> COALESCE(n.HCPCS_CD_12, '') THEN 1 ELSE 0 END,
+                HCPCS_CD_13 = CASE WHEN COALESCE(s.HCPCS_CD_13, '') <> COALESCE(n.HCPCS_CD_13, '') THEN 1 ELSE 0 END
+            FROM audit_carrier_src s
+            LEFT JOIN audit_carrier_new n
+            ON s.DESYNPUF_ID = n.DESYNPUF_ID
+            AND s.CLM_ID      = n.CLM_ID
+            AND s.CLM_FROM_DT = n.CLM_FROM_DT
+            AND s.CLM_THRU_DT = n.CLM_THRU_DT
+            WHERE t.DESYNPUF_ID = s.DESYNPUF_ID
+            AND t.CLM_ID      = s.CLM_ID
+            AND t.CLM_FROM_DT = s.CLM_FROM_DT
+            AND t.CLM_THRU_DT = s.CLM_THRU_DT;"""
+        try:
+            execute_sql_script(sql_script)
+            logger.info("✅ Phase 3c5 SQL transformations completed successfully")
+        except Exception as e:
+            logger.error(f"Error running Phase 3c5 SQL transformations: {e}")
+            raise
+
+        logger.info("Starting Phase 3c6 SQL transformations.")
+        sql_script = """
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_NCH_PMT_AMT_1  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_NCH_PMT_AMT_2  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_NCH_PMT_AMT_3  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_NCH_PMT_AMT_4  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_NCH_PMT_AMT_5  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_NCH_PMT_AMT_6  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_NCH_PMT_AMT_7  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_NCH_PMT_AMT_8  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_NCH_PMT_AMT_9  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_NCH_PMT_AMT_10 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_NCH_PMT_AMT_11 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_NCH_PMT_AMT_12 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_NCH_PMT_AMT_13 INTEGER;
+
+            UPDATE audit_carrier_claims t
+            SET
+                LINE_NCH_PMT_AMT_1  = CASE WHEN COALESCE(s.LINE_NCH_PMT_AMT_1,  0) <> COALESCE(n.LINE_NCH_PMT_AMT_1,  0) THEN 1 ELSE 0 END,
+                LINE_NCH_PMT_AMT_2  = CASE WHEN COALESCE(s.LINE_NCH_PMT_AMT_2,  0) <> COALESCE(n.LINE_NCH_PMT_AMT_2,  0) THEN 1 ELSE 0 END,
+                LINE_NCH_PMT_AMT_3  = CASE WHEN COALESCE(s.LINE_NCH_PMT_AMT_3,  0) <> COALESCE(n.LINE_NCH_PMT_AMT_3,  0) THEN 1 ELSE 0 END,
+                LINE_NCH_PMT_AMT_4  = CASE WHEN COALESCE(s.LINE_NCH_PMT_AMT_4,  0) <> COALESCE(n.LINE_NCH_PMT_AMT_4,  0) THEN 1 ELSE 0 END,
+                LINE_NCH_PMT_AMT_5  = CASE WHEN COALESCE(s.LINE_NCH_PMT_AMT_5,  0) <> COALESCE(n.LINE_NCH_PMT_AMT_5,  0) THEN 1 ELSE 0 END,
+                LINE_NCH_PMT_AMT_6  = CASE WHEN COALESCE(s.LINE_NCH_PMT_AMT_6,  0) <> COALESCE(n.LINE_NCH_PMT_AMT_6,  0) THEN 1 ELSE 0 END,
+                LINE_NCH_PMT_AMT_7  = CASE WHEN COALESCE(s.LINE_NCH_PMT_AMT_7,  0) <> COALESCE(n.LINE_NCH_PMT_AMT_7,  0) THEN 1 ELSE 0 END,
+                LINE_NCH_PMT_AMT_8  = CASE WHEN COALESCE(s.LINE_NCH_PMT_AMT_8,  0) <> COALESCE(n.LINE_NCH_PMT_AMT_8,  0) THEN 1 ELSE 0 END,
+                LINE_NCH_PMT_AMT_9  = CASE WHEN COALESCE(s.LINE_NCH_PMT_AMT_9,  0) <> COALESCE(n.LINE_NCH_PMT_AMT_9,  0) THEN 1 ELSE 0 END,
+                LINE_NCH_PMT_AMT_10 = CASE WHEN COALESCE(s.LINE_NCH_PMT_AMT_10, 0) <> COALESCE(n.LINE_NCH_PMT_AMT_10, 0) THEN 1 ELSE 0 END,
+                LINE_NCH_PMT_AMT_11 = CASE WHEN COALESCE(s.LINE_NCH_PMT_AMT_11, 0) <> COALESCE(n.LINE_NCH_PMT_AMT_11, 0) THEN 1 ELSE 0 END,
+                LINE_NCH_PMT_AMT_12 = CASE WHEN COALESCE(s.LINE_NCH_PMT_AMT_12, 0) <> COALESCE(n.LINE_NCH_PMT_AMT_12, 0) THEN 1 ELSE 0 END,
+                LINE_NCH_PMT_AMT_13 = CASE WHEN COALESCE(s.LINE_NCH_PMT_AMT_13, 0) <> COALESCE(n.LINE_NCH_PMT_AMT_13, 0) THEN 1 ELSE 0 END
+            FROM audit_carrier_src s
+            LEFT JOIN audit_carrier_new n
+            ON s.DESYNPUF_ID = n.DESYNPUF_ID
+            AND s.CLM_ID      = n.CLM_ID
+            AND s.CLM_FROM_DT = n.CLM_FROM_DT
+            AND s.CLM_THRU_DT = n.CLM_THRU_DT
+            WHERE t.DESYNPUF_ID = s.DESYNPUF_ID
+            AND t.CLM_ID      = s.CLM_ID
+            AND t.CLM_FROM_DT = s.CLM_FROM_DT
+            AND t.CLM_THRU_DT = s.CLM_THRU_DT;"""
+        try:
+            execute_sql_script(sql_script)
+            logger.info("✅ Phase 3c6 SQL transformations completed successfully")
+        except Exception as e:
+            logger.error(f"Error running Phase 3c6 SQL transformations: {e}")
+            raise
+
+        logger.info("Starting Phase 3c7 SQL transformations.")
+        sql_script = """
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_BENE_PTB_DDCTBL_AMT_1  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_BENE_PTB_DDCTBL_AMT_2  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_BENE_PTB_DDCTBL_AMT_3  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_BENE_PTB_DDCTBL_AMT_4  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_BENE_PTB_DDCTBL_AMT_5  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_BENE_PTB_DDCTBL_AMT_6  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_BENE_PTB_DDCTBL_AMT_7  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_BENE_PTB_DDCTBL_AMT_8  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_BENE_PTB_DDCTBL_AMT_9  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_BENE_PTB_DDCTBL_AMT_10 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_BENE_PTB_DDCTBL_AMT_11 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_BENE_PTB_DDCTBL_AMT_12 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_BENE_PTB_DDCTBL_AMT_13 INTEGER;
+
+            UPDATE audit_carrier_claims t
+            SET
+                LINE_BENE_PTB_DDCTBL_AMT_1  = CASE WHEN COALESCE(s.LINE_BENE_PTB_DDCTBL_AMT_1,  0) <> COALESCE(n.LINE_BENE_PTB_DDCTBL_AMT_1,  0) THEN 1 ELSE 0 END,
+                LINE_BENE_PTB_DDCTBL_AMT_2  = CASE WHEN COALESCE(s.LINE_BENE_PTB_DDCTBL_AMT_2,  0) <> COALESCE(n.LINE_BENE_PTB_DDCTBL_AMT_2,  0) THEN 1 ELSE 0 END,
+                LINE_BENE_PTB_DDCTBL_AMT_3  = CASE WHEN COALESCE(s.LINE_BENE_PTB_DDCTBL_AMT_3,  0) <> COALESCE(n.LINE_BENE_PTB_DDCTBL_AMT_3,  0) THEN 1 ELSE 0 END,
+                LINE_BENE_PTB_DDCTBL_AMT_4  = CASE WHEN COALESCE(s.LINE_BENE_PTB_DDCTBL_AMT_4,  0) <> COALESCE(n.LINE_BENE_PTB_DDCTBL_AMT_4,  0) THEN 1 ELSE 0 END,
+                LINE_BENE_PTB_DDCTBL_AMT_5  = CASE WHEN COALESCE(s.LINE_BENE_PTB_DDCTBL_AMT_5,  0) <> COALESCE(n.LINE_BENE_PTB_DDCTBL_AMT_5,  0) THEN 1 ELSE 0 END,
+                LINE_BENE_PTB_DDCTBL_AMT_6  = CASE WHEN COALESCE(s.LINE_BENE_PTB_DDCTBL_AMT_6,  0) <> COALESCE(n.LINE_BENE_PTB_DDCTBL_AMT_6,  0) THEN 1 ELSE 0 END,
+                LINE_BENE_PTB_DDCTBL_AMT_7  = CASE WHEN COALESCE(s.LINE_BENE_PTB_DDCTBL_AMT_7,  0) <> COALESCE(n.LINE_BENE_PTB_DDCTBL_AMT_7,  0) THEN 1 ELSE 0 END,
+                LINE_BENE_PTB_DDCTBL_AMT_8  = CASE WHEN COALESCE(s.LINE_BENE_PTB_DDCTBL_AMT_8,  0) <> COALESCE(n.LINE_BENE_PTB_DDCTBL_AMT_8,  0) THEN 1 ELSE 0 END,
+                LINE_BENE_PTB_DDCTBL_AMT_9  = CASE WHEN COALESCE(s.LINE_BENE_PTB_DDCTBL_AMT_9,  0) <> COALESCE(n.LINE_BENE_PTB_DDCTBL_AMT_9,  0) THEN 1 ELSE 0 END,
+                LINE_BENE_PTB_DDCTBL_AMT_10 = CASE WHEN COALESCE(s.LINE_BENE_PTB_DDCTBL_AMT_10, 0) <> COALESCE(n.LINE_BENE_PTB_DDCTBL_AMT_10, 0) THEN 1 ELSE 0 END,
+                LINE_BENE_PTB_DDCTBL_AMT_11 = CASE WHEN COALESCE(s.LINE_BENE_PTB_DDCTBL_AMT_11, 0) <> COALESCE(n.LINE_BENE_PTB_DDCTBL_AMT_11, 0) THEN 1 ELSE 0 END,
+                LINE_BENE_PTB_DDCTBL_AMT_12 = CASE WHEN COALESCE(s.LINE_BENE_PTB_DDCTBL_AMT_12, 0) <> COALESCE(n.LINE_BENE_PTB_DDCTBL_AMT_12, 0) THEN 1 ELSE 0 END,
+                LINE_BENE_PTB_DDCTBL_AMT_13 = CASE WHEN COALESCE(s.LINE_BENE_PTB_DDCTBL_AMT_13, 0) <> COALESCE(n.LINE_BENE_PTB_DDCTBL_AMT_13, 0) THEN 1 ELSE 0 END
+            FROM audit_carrier_src s
+            LEFT JOIN audit_carrier_new n
+            ON s.DESYNPUF_ID = n.DESYNPUF_ID
+            AND s.CLM_ID      = n.CLM_ID
+            AND s.CLM_FROM_DT = n.CLM_FROM_DT
+            AND s.CLM_THRU_DT = n.CLM_THRU_DT
+            WHERE t.DESYNPUF_ID = s.DESYNPUF_ID
+            AND t.CLM_ID      = s.CLM_ID
+            AND t.CLM_FROM_DT = s.CLM_FROM_DT
+            AND t.CLM_THRU_DT = s.CLM_THRU_DT;"""
+        try:
+            execute_sql_script(sql_script)
+            logger.info("✅ Phase 3c7 SQL transformations completed successfully")
+        except Exception as e:
+            logger.error(f"Error running Phase 3c7 SQL transformations: {e}")
+            raise
+
+        logger.info("Starting Phase 3c8 SQL transformations.")
+        sql_script = """
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_BENE_PRMRY_PYR_PD_AMT_1  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_BENE_PRMRY_PYR_PD_AMT_2  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_BENE_PRMRY_PYR_PD_AMT_3  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_BENE_PRMRY_PYR_PD_AMT_4  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_BENE_PRMRY_PYR_PD_AMT_5  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_BENE_PRMRY_PYR_PD_AMT_6  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_BENE_PRMRY_PYR_PD_AMT_7  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_BENE_PRMRY_PYR_PD_AMT_8  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_BENE_PRMRY_PYR_PD_AMT_9  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_BENE_PRMRY_PYR_PD_AMT_10 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_BENE_PRMRY_PYR_PD_AMT_11 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_BENE_PRMRY_PYR_PD_AMT_12 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_BENE_PRMRY_PYR_PD_AMT_13 INTEGER;
+
+            UPDATE audit_carrier_claims t
+            SET
+                LINE_BENE_PRMRY_PYR_PD_AMT_1  = CASE WHEN COALESCE(s.LINE_BENE_PRMRY_PYR_PD_AMT_1,  0) <> COALESCE(n.LINE_BENE_PRMRY_PYR_PD_AMT_1,  0) THEN 1 ELSE 0 END,
+                LINE_BENE_PRMRY_PYR_PD_AMT_2  = CASE WHEN COALESCE(s.LINE_BENE_PRMRY_PYR_PD_AMT_2,  0) <> COALESCE(n.LINE_BENE_PRMRY_PYR_PD_AMT_2,  0) THEN 1 ELSE 0 END,
+                LINE_BENE_PRMRY_PYR_PD_AMT_3  = CASE WHEN COALESCE(s.LINE_BENE_PRMRY_PYR_PD_AMT_3,  0) <> COALESCE(n.LINE_BENE_PRMRY_PYR_PD_AMT_3,  0) THEN 1 ELSE 0 END,
+                LINE_BENE_PRMRY_PYR_PD_AMT_4  = CASE WHEN COALESCE(s.LINE_BENE_PRMRY_PYR_PD_AMT_4,  0) <> COALESCE(n.LINE_BENE_PRMRY_PYR_PD_AMT_4,  0) THEN 1 ELSE 0 END,
+                LINE_BENE_PRMRY_PYR_PD_AMT_5  = CASE WHEN COALESCE(s.LINE_BENE_PRMRY_PYR_PD_AMT_5,  0) <> COALESCE(n.LINE_BENE_PRMRY_PYR_PD_AMT_5,  0) THEN 1 ELSE 0 END,
+                LINE_BENE_PRMRY_PYR_PD_AMT_6  = CASE WHEN COALESCE(s.LINE_BENE_PRMRY_PYR_PD_AMT_6,  0) <> COALESCE(n.LINE_BENE_PRMRY_PYR_PD_AMT_6,  0) THEN 1 ELSE 0 END,
+                LINE_BENE_PRMRY_PYR_PD_AMT_7  = CASE WHEN COALESCE(s.LINE_BENE_PRMRY_PYR_PD_AMT_7,  0) <> COALESCE(n.LINE_BENE_PRMRY_PYR_PD_AMT_7,  0) THEN 1 ELSE 0 END,
+                LINE_BENE_PRMRY_PYR_PD_AMT_8  = CASE WHEN COALESCE(s.LINE_BENE_PRMRY_PYR_PD_AMT_8,  0) <> COALESCE(n.LINE_BENE_PRMRY_PYR_PD_AMT_8,  0) THEN 1 ELSE 0 END,
+                LINE_BENE_PRMRY_PYR_PD_AMT_9  = CASE WHEN COALESCE(s.LINE_BENE_PRMRY_PYR_PD_AMT_9,  0) <> COALESCE(n.LINE_BENE_PRMRY_PYR_PD_AMT_9,  0) THEN 1 ELSE 0 END,
+                LINE_BENE_PRMRY_PYR_PD_AMT_10 = CASE WHEN COALESCE(s.LINE_BENE_PRMRY_PYR_PD_AMT_10, 0) <> COALESCE(n.LINE_BENE_PRMRY_PYR_PD_AMT_10, 0) THEN 1 ELSE 0 END,
+                LINE_BENE_PRMRY_PYR_PD_AMT_11 = CASE WHEN COALESCE(s.LINE_BENE_PRMRY_PYR_PD_AMT_11, 0) <> COALESCE(n.LINE_BENE_PRMRY_PYR_PD_AMT_11, 0) THEN 1 ELSE 0 END,
+                LINE_BENE_PRMRY_PYR_PD_AMT_12 = CASE WHEN COALESCE(s.LINE_BENE_PRMRY_PYR_PD_AMT_12, 0) <> COALESCE(n.LINE_BENE_PRMRY_PYR_PD_AMT_12, 0) THEN 1 ELSE 0 END,
+                LINE_BENE_PRMRY_PYR_PD_AMT_13 = CASE WHEN COALESCE(s.LINE_BENE_PRMRY_PYR_PD_AMT_13, 0) <> COALESCE(n.LINE_BENE_PRMRY_PYR_PD_AMT_13, 0) THEN 1 ELSE 0 END
+            FROM audit_carrier_src s
+            LEFT JOIN audit_carrier_new n
+            ON s.DESYNPUF_ID = n.DESYNPUF_ID
+            AND s.CLM_ID      = n.CLM_ID
+            AND s.CLM_FROM_DT = n.CLM_FROM_DT
+            AND s.CLM_THRU_DT = n.CLM_THRU_DT
+            WHERE t.DESYNPUF_ID = s.DESYNPUF_ID
+            AND t.CLM_ID      = s.CLM_ID
+            AND t.CLM_FROM_DT = s.CLM_FROM_DT
+            AND t.CLM_THRU_DT = s.CLM_THRU_DT;"""
+        try:
+            execute_sql_script(sql_script)
+            logger.info("✅ Phase 3c8 SQL transformations completed successfully")
+        except Exception as e:
+            logger.error(f"Error running Phase 3c8 SQL transformations: {e}")
+            raise
+
+        logger.info("Starting Phase 3c9 SQL transformations.")
+        sql_script = """
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_COINSRNC_AMT_1  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_COINSRNC_AMT_2  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_COINSRNC_AMT_3  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_COINSRNC_AMT_4  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_COINSRNC_AMT_5  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_COINSRNC_AMT_6  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_COINSRNC_AMT_7  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_COINSRNC_AMT_8  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_COINSRNC_AMT_9  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_COINSRNC_AMT_10 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_COINSRNC_AMT_11 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_COINSRNC_AMT_12 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_COINSRNC_AMT_13 INTEGER;
+
+            UPDATE audit_carrier_claims t
+            SET
+                LINE_COINSRNC_AMT_1  = CASE WHEN COALESCE(s.LINE_COINSRNC_AMT_1,  0) <> COALESCE(n.LINE_COINSRNC_AMT_1,  0) THEN 1 ELSE 0 END,
+                LINE_COINSRNC_AMT_2  = CASE WHEN COALESCE(s.LINE_COINSRNC_AMT_2,  0) <> COALESCE(n.LINE_COINSRNC_AMT_2,  0) THEN 1 ELSE 0 END,
+                LINE_COINSRNC_AMT_3  = CASE WHEN COALESCE(s.LINE_COINSRNC_AMT_3,  0) <> COALESCE(n.LINE_COINSRNC_AMT_3,  0) THEN 1 ELSE 0 END,
+                LINE_COINSRNC_AMT_4  = CASE WHEN COALESCE(s.LINE_COINSRNC_AMT_4,  0) <> COALESCE(n.LINE_COINSRNC_AMT_4,  0) THEN 1 ELSE 0 END,
+                LINE_COINSRNC_AMT_5  = CASE WHEN COALESCE(s.LINE_COINSRNC_AMT_5,  0) <> COALESCE(n.LINE_COINSRNC_AMT_5,  0) THEN 1 ELSE 0 END,
+                LINE_COINSRNC_AMT_6  = CASE WHEN COALESCE(s.LINE_COINSRNC_AMT_6,  0) <> COALESCE(n.LINE_COINSRNC_AMT_6,  0) THEN 1 ELSE 0 END,
+                LINE_COINSRNC_AMT_7  = CASE WHEN COALESCE(s.LINE_COINSRNC_AMT_7,  0) <> COALESCE(n.LINE_COINSRNC_AMT_7,  0) THEN 1 ELSE 0 END,
+                LINE_COINSRNC_AMT_8  = CASE WHEN COALESCE(s.LINE_COINSRNC_AMT_8,  0) <> COALESCE(n.LINE_COINSRNC_AMT_8,  0) THEN 1 ELSE 0 END,
+                LINE_COINSRNC_AMT_9  = CASE WHEN COALESCE(s.LINE_COINSRNC_AMT_9,  0) <> COALESCE(n.LINE_COINSRNC_AMT_9,  0) THEN 1 ELSE 0 END,
+                LINE_COINSRNC_AMT_10 = CASE WHEN COALESCE(s.LINE_COINSRNC_AMT_10, 0) <> COALESCE(n.LINE_COINSRNC_AMT_10, 0) THEN 1 ELSE 0 END,
+                LINE_COINSRNC_AMT_11 = CASE WHEN COALESCE(s.LINE_COINSRNC_AMT_11, 0) <> COALESCE(n.LINE_COINSRNC_AMT_11, 0) THEN 1 ELSE 0 END,
+                LINE_COINSRNC_AMT_12 = CASE WHEN COALESCE(s.LINE_COINSRNC_AMT_12, 0) <> COALESCE(n.LINE_COINSRNC_AMT_12, 0) THEN 1 ELSE 0 END,
+                LINE_COINSRNC_AMT_13 = CASE WHEN COALESCE(s.LINE_COINSRNC_AMT_13, 0) <> COALESCE(n.LINE_COINSRNC_AMT_13, 0) THEN 1 ELSE 0 END
+            FROM audit_carrier_src s
+            LEFT JOIN audit_carrier_new n
+            ON s.DESYNPUF_ID = n.DESYNPUF_ID
+            AND s.CLM_ID      = n.CLM_ID
+            AND s.CLM_FROM_DT = n.CLM_FROM_DT
+            AND s.CLM_THRU_DT = n.CLM_THRU_DT
+            WHERE t.DESYNPUF_ID = s.DESYNPUF_ID
+            AND t.CLM_ID      = s.CLM_ID
+            AND t.CLM_FROM_DT = s.CLM_FROM_DT
+            AND t.CLM_THRU_DT = s.CLM_THRU_DT;"""
+        try:
+            execute_sql_script(sql_script)
+            logger.info("✅ Phase 3c9 SQL transformations completed successfully")
+        except Exception as e:
+            logger.error(f"Error running Phase 3c9 SQL transformations: {e}")
+            raise
+
+        logger.info("Starting Phase 3c10 SQL transformations.")
+        sql_script = """
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_ALOWD_CHRG_AMT_1  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_ALOWD_CHRG_AMT_2  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_ALOWD_CHRG_AMT_3  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_ALOWD_CHRG_AMT_4  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_ALOWD_CHRG_AMT_5  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_ALOWD_CHRG_AMT_6  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_ALOWD_CHRG_AMT_7  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_ALOWD_CHRG_AMT_8  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_ALOWD_CHRG_AMT_9  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_ALOWD_CHRG_AMT_10 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_ALOWD_CHRG_AMT_11 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_ALOWD_CHRG_AMT_12 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_ALOWD_CHRG_AMT_13 INTEGER;
+
+            UPDATE audit_carrier_claims t
+            SET
+                LINE_ALOWD_CHRG_AMT_1  = CASE WHEN COALESCE(s.LINE_ALOWD_CHRG_AMT_1,  0) <> COALESCE(n.LINE_ALOWD_CHRG_AMT_1,  0) THEN 1 ELSE 0 END,
+                LINE_ALOWD_CHRG_AMT_2  = CASE WHEN COALESCE(s.LINE_ALOWD_CHRG_AMT_2,  0) <> COALESCE(n.LINE_ALOWD_CHRG_AMT_2,  0) THEN 1 ELSE 0 END,
+                LINE_ALOWD_CHRG_AMT_3  = CASE WHEN COALESCE(s.LINE_ALOWD_CHRG_AMT_3,  0) <> COALESCE(n.LINE_ALOWD_CHRG_AMT_3,  0) THEN 1 ELSE 0 END,
+                LINE_ALOWD_CHRG_AMT_4  = CASE WHEN COALESCE(s.LINE_ALOWD_CHRG_AMT_4,  0) <> COALESCE(n.LINE_ALOWD_CHRG_AMT_4,  0) THEN 1 ELSE 0 END,
+                LINE_ALOWD_CHRG_AMT_5  = CASE WHEN COALESCE(s.LINE_ALOWD_CHRG_AMT_5,  0) <> COALESCE(n.LINE_ALOWD_CHRG_AMT_5,  0) THEN 1 ELSE 0 END,
+                LINE_ALOWD_CHRG_AMT_6  = CASE WHEN COALESCE(s.LINE_ALOWD_CHRG_AMT_6,  0) <> COALESCE(n.LINE_ALOWD_CHRG_AMT_6,  0) THEN 1 ELSE 0 END,
+                LINE_ALOWD_CHRG_AMT_7  = CASE WHEN COALESCE(s.LINE_ALOWD_CHRG_AMT_7,  0) <> COALESCE(n.LINE_ALOWD_CHRG_AMT_7,  0) THEN 1 ELSE 0 END,
+                LINE_ALOWD_CHRG_AMT_8  = CASE WHEN COALESCE(s.LINE_ALOWD_CHRG_AMT_8,  0) <> COALESCE(n.LINE_ALOWD_CHRG_AMT_8,  0) THEN 1 ELSE 0 END,
+                LINE_ALOWD_CHRG_AMT_9  = CASE WHEN COALESCE(s.LINE_ALOWD_CHRG_AMT_9,  0) <> COALESCE(n.LINE_ALOWD_CHRG_AMT_9,  0) THEN 1 ELSE 0 END,
+                LINE_ALOWD_CHRG_AMT_10 = CASE WHEN COALESCE(s.LINE_ALOWD_CHRG_AMT_10, 0) <> COALESCE(n.LINE_ALOWD_CHRG_AMT_10, 0) THEN 1 ELSE 0 END,
+                LINE_ALOWD_CHRG_AMT_11 = CASE WHEN COALESCE(s.LINE_ALOWD_CHRG_AMT_11, 0) <> COALESCE(n.LINE_ALOWD_CHRG_AMT_11, 0) THEN 1 ELSE 0 END,
+                LINE_ALOWD_CHRG_AMT_12 = CASE WHEN COALESCE(s.LINE_ALOWD_CHRG_AMT_12, 0) <> COALESCE(n.LINE_ALOWD_CHRG_AMT_12, 0) THEN 1 ELSE 0 END,
+                LINE_ALOWD_CHRG_AMT_13 = CASE WHEN COALESCE(s.LINE_ALOWD_CHRG_AMT_13, 0) <> COALESCE(n.LINE_ALOWD_CHRG_AMT_13, 0) THEN 1 ELSE 0 END
+            FROM audit_carrier_src s
+            LEFT JOIN audit_carrier_new n
+            ON s.DESYNPUF_ID = n.DESYNPUF_ID
+            AND s.CLM_ID      = n.CLM_ID
+            AND s.CLM_FROM_DT = n.CLM_FROM_DT
+            AND s.CLM_THRU_DT = n.CLM_THRU_DT
+            WHERE t.DESYNPUF_ID = s.DESYNPUF_ID
+            AND t.CLM_ID      = s.CLM_ID
+            AND t.CLM_FROM_DT = s.CLM_FROM_DT
+            AND t.CLM_THRU_DT = s.CLM_THRU_DT;"""
+        try:
+            execute_sql_script(sql_script)
+            logger.info("✅ Phase 3c10 SQL transformations completed successfully")
+        except Exception as e:
+            logger.error(f"Error running Phase 3c10 SQL transformations: {e}")
+            raise
+
+        logger.info("Starting Phase 3c11 SQL transformations.")
+        sql_script = """
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_PRCSG_IND_CD_1  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_PRCSG_IND_CD_2  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_PRCSG_IND_CD_3  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_PRCSG_IND_CD_4  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_PRCSG_IND_CD_5  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_PRCSG_IND_CD_6  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_PRCSG_IND_CD_7  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_PRCSG_IND_CD_8  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_PRCSG_IND_CD_9  INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_PRCSG_IND_CD_10 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_PRCSG_IND_CD_11 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_PRCSG_IND_CD_12 INTEGER;
+            ALTER TABLE audit_carrier_claims ADD COLUMN LINE_PRCSG_IND_CD_13 INTEGER;
+
+            UPDATE audit_carrier_claims t
+            SET
+                LINE_PRCSG_IND_CD_1  = CASE WHEN COALESCE(s.LINE_PRCSG_IND_CD_1,  '') <> COALESCE(n.LINE_PRCSG_IND_CD_1,  '') THEN 1 ELSE 0 END,
+                LINE_PRCSG_IND_CD_2  = CASE WHEN COALESCE(s.LINE_PRCSG_IND_CD_2,  '') <> COALESCE(n.LINE_PRCSG_IND_CD_2,  '') THEN 1 ELSE 0 END,
+                LINE_PRCSG_IND_CD_3  = CASE WHEN COALESCE(s.LINE_PRCSG_IND_CD_3,  '') <> COALESCE(n.LINE_PRCSG_IND_CD_3,  '') THEN 1 ELSE 0 END,
+                LINE_PRCSG_IND_CD_4  = CASE WHEN COALESCE(s.LINE_PRCSG_IND_CD_4,  '') <> COALESCE(n.LINE_PRCSG_IND_CD_4,  '') THEN 1 ELSE 0 END,
+                LINE_PRCSG_IND_CD_5  = CASE WHEN COALESCE(s.LINE_PRCSG_IND_CD_5,  '') <> COALESCE(n.LINE_PRCSG_IND_CD_5,  '') THEN 1 ELSE 0 END,
+                LINE_PRCSG_IND_CD_6  = CASE WHEN COALESCE(s.LINE_PRCSG_IND_CD_6,  '') <> COALESCE(n.LINE_PRCSG_IND_CD_6,  '') THEN 1 ELSE 0 END,
+                LINE_PRCSG_IND_CD_7  = CASE WHEN COALESCE(s.LINE_PRCSG_IND_CD_7,  '') <> COALESCE(n.LINE_PRCSG_IND_CD_7,  '') THEN 1 ELSE 0 END,
+                LINE_PRCSG_IND_CD_8  = CASE WHEN COALESCE(s.LINE_PRCSG_IND_CD_8,  '') <> COALESCE(n.LINE_PRCSG_IND_CD_8,  '') THEN 1 ELSE 0 END,
+                LINE_PRCSG_IND_CD_9  = CASE WHEN COALESCE(s.LINE_PRCSG_IND_CD_9,  '') <> COALESCE(n.LINE_PRCSG_IND_CD_9,  '') THEN 1 ELSE 0 END,
+                LINE_PRCSG_IND_CD_10 = CASE WHEN COALESCE(s.LINE_PRCSG_IND_CD_10, '') <> COALESCE(n.LINE_PRCSG_IND_CD_10, '') THEN 1 ELSE 0 END,
+                LINE_PRCSG_IND_CD_11 = CASE WHEN COALESCE(s.LINE_PRCSG_IND_CD_11, '') <> COALESCE(n.LINE_PRCSG_IND_CD_11, '') THEN 1 ELSE 0 END,
+                LINE_PRCSG_IND_CD_12 = CASE WHEN COALESCE(s.LINE_PRCSG_IND_CD_12, '') <> COALESCE(n.LINE_PRCSG_IND_CD_12, '') THEN 1 ELSE 0 END,
+                LINE_PRCSG_IND_CD_13 = CASE WHEN COALESCE(s.LINE_PRCSG_IND_CD_13, '') <> COALESCE(n.LINE_PRCSG_IND_CD_13, '') THEN 1 ELSE 0 END
+            FROM audit_carrier_src s
+            LEFT JOIN audit_carrier_new n
+            ON s.DESYNPUF_ID = n.DESYNPUF_ID
+            AND s.CLM_ID      = n.CLM_ID
+            AND s.CLM_FROM_DT = n.CLM_FROM_DT
+            AND s.CLM_THRU_DT = n.CLM_THRU_DT
+            WHERE t.DESYNPUF_ID = s.DESYNPUF_ID
+            AND t.CLM_ID      = s.CLM_ID
+            AND t.CLM_FROM_DT = s.CLM_FROM_DT
+            AND t.CLM_THRU_DT = s.CLM_THRU_DT;"""
+        try:
+            execute_sql_script(sql_script)
+            logger.info("✅ Phase 3c11 SQL transformations completed successfully")
+        except Exception as e:
+            logger.error(f"Error running Phase 3c11 SQL transformations: {e}")
+            raise
+
+        logger.info("Starting Phase 3c12 SQL transformations.")
+        sql_script = """
+        ALTER TABLE audit_carrier_claims ADD COLUMN LINE_ICD9_DGNS_CD_1  INTEGER;
+        ALTER TABLE audit_carrier_claims ADD COLUMN LINE_ICD9_DGNS_CD_2  INTEGER;
+        ALTER TABLE audit_carrier_claims ADD COLUMN LINE_ICD9_DGNS_CD_3  INTEGER;
+        ALTER TABLE audit_carrier_claims ADD COLUMN LINE_ICD9_DGNS_CD_4  INTEGER;
+        ALTER TABLE audit_carrier_claims ADD COLUMN LINE_ICD9_DGNS_CD_5  INTEGER;
+        ALTER TABLE audit_carrier_claims ADD COLUMN LINE_ICD9_DGNS_CD_6  INTEGER;
+        ALTER TABLE audit_carrier_claims ADD COLUMN LINE_ICD9_DGNS_CD_7  INTEGER;
+        ALTER TABLE audit_carrier_claims ADD COLUMN LINE_ICD9_DGNS_CD_8  INTEGER;
+        ALTER TABLE audit_carrier_claims ADD COLUMN LINE_ICD9_DGNS_CD_9  INTEGER;
+        ALTER TABLE audit_carrier_claims ADD COLUMN LINE_ICD9_DGNS_CD_10 INTEGER;
+        ALTER TABLE audit_carrier_claims ADD COLUMN LINE_ICD9_DGNS_CD_11 INTEGER;
+        ALTER TABLE audit_carrier_claims ADD COLUMN LINE_ICD9_DGNS_CD_12 INTEGER;
+        ALTER TABLE audit_carrier_claims ADD COLUMN LINE_ICD9_DGNS_CD_13 INTEGER;
+
+        UPDATE audit_carrier_claims t
+        SET
+            LINE_ICD9_DGNS_CD_1  = CASE WHEN COALESCE(s.LINE_ICD9_DGNS_CD_1,  '') <> COALESCE(n.LINE_ICD9_DGNS_CD_1,  '') THEN 1 ELSE 0 END,
+            LINE_ICD9_DGNS_CD_2  = CASE WHEN COALESCE(s.LINE_ICD9_DGNS_CD_2,  '') <> COALESCE(n.LINE_ICD9_DGNS_CD_2,  '') THEN 1 ELSE 0 END,
+            LINE_ICD9_DGNS_CD_3  = CASE WHEN COALESCE(s.LINE_ICD9_DGNS_CD_3,  '') <> COALESCE(n.LINE_ICD9_DGNS_CD_3,  '') THEN 1 ELSE 0 END,
+            LINE_ICD9_DGNS_CD_4  = CASE WHEN COALESCE(s.LINE_ICD9_DGNS_CD_4,  '') <> COALESCE(n.LINE_ICD9_DGNS_CD_4,  '') THEN 1 ELSE 0 END,
+            LINE_ICD9_DGNS_CD_5  = CASE WHEN COALESCE(s.LINE_ICD9_DGNS_CD_5,  '') <> COALESCE(n.LINE_ICD9_DGNS_CD_5,  '') THEN 1 ELSE 0 END,
+            LINE_ICD9_DGNS_CD_6  = CASE WHEN COALESCE(s.LINE_ICD9_DGNS_CD_6,  '') <> COALESCE(n.LINE_ICD9_DGNS_CD_6,  '') THEN 1 ELSE 0 END,
+            LINE_ICD9_DGNS_CD_7  = CASE WHEN COALESCE(s.LINE_ICD9_DGNS_CD_7,  '') <> COALESCE(n.LINE_ICD9_DGNS_CD_7,  '') THEN 1 ELSE 0 END,
+            LINE_ICD9_DGNS_CD_8  = CASE WHEN COALESCE(s.LINE_ICD9_DGNS_CD_8,  '') <> COALESCE(n.LINE_ICD9_DGNS_CD_8,  '') THEN 1 ELSE 0 END,
+            LINE_ICD9_DGNS_CD_9  = CASE WHEN COALESCE(s.LINE_ICD9_DGNS_CD_9,  '') <> COALESCE(n.LINE_ICD9_DGNS_CD_9,  '') THEN 1 ELSE 0 END,
+            LINE_ICD9_DGNS_CD_10 = CASE WHEN COALESCE(s.LINE_ICD9_DGNS_CD_10, '') <> COALESCE(n.LINE_ICD9_DGNS_CD_10, '') THEN 1 ELSE 0 END,
+            LINE_ICD9_DGNS_CD_11 = CASE WHEN COALESCE(s.LINE_ICD9_DGNS_CD_11, '') <> COALESCE(n.LINE_ICD9_DGNS_CD_11, '') THEN 1 ELSE 0 END,
+            LINE_ICD9_DGNS_CD_12 = CASE WHEN COALESCE(s.LINE_ICD9_DGNS_CD_12, '') <> COALESCE(n.LINE_ICD9_DGNS_CD_12, '') THEN 1 ELSE 0 END,
+            LINE_ICD9_DGNS_CD_13 = CASE WHEN COALESCE(s.LINE_ICD9_DGNS_CD_13, '') <> COALESCE(n.LINE_ICD9_DGNS_CD_13, '') THEN 1 ELSE 0 END
+        FROM audit_carrier_src s
+        LEFT JOIN audit_carrier_new n
+        ON s.DESYNPUF_ID = n.DESYNPUF_ID
+        AND s.CLM_ID      = n.CLM_ID
+        AND s.CLM_FROM_DT = n.CLM_FROM_DT
+        AND s.CLM_THRU_DT = n.CLM_THRU_DT
+        WHERE t.DESYNPUF_ID = s.DESYNPUF_ID
+        AND t.CLM_ID      = s.CLM_ID
+        AND t.CLM_FROM_DT = s.CLM_FROM_DT
+        AND t.CLM_THRU_DT = s.CLM_THRU_DT;"""
+        try:
+            execute_sql_script(sql_script)
+            logger.info("✅ Phase 3c12 SQL transformations completed successfully")
+        except Exception as e:
+            logger.error(f"Error running Phase 3c12 SQL transformations: {e}")
+            raise
+
+    logger.info("Starting Phase 3c13 SQL transformations.")
+    sql_script = """
+        CREATE INDEX idx_audit_carrier_claims_keys 
+            ON audit_carrier_claims (DESYNPUF_ID, CLM_ID, CLM_FROM_DT, CLM_THRU_DT);
+        ANALYZE audit_carrier_claims;
+        """
+    try:
+        execute_sql_script(sql_script)
+        logger.info("✅ Phase 3c13 SQL transformations completed successfully")
+    except Exception as e:
+        logger.error(f"Error running Phase 3c13 SQL transformations: {e}")
+        raise
+
+    logger.info("Starting Phase 4 SQL transformations.")
+    sql_script = """
         DROP TABLE IF EXISTS audit_carrier_financials;
         CREATE TABLE audit_carrier_financials AS
         WITH KEYS AS (
@@ -1719,9 +2637,16 @@ def main():
         FROM flat
         CROSS JOIN UNNEST(metrics)
         GROUP BY unnest.metric_name
-        ORDER BY total_abs_delta DESC;
-
-        /*SIX SIGMA ANALYSIS*/
+        ORDER BY total_abs_delta DESC;"""
+    try:
+        execute_sql_script(sql_script)
+        logger.info("✅ Phase 4 SQL transformations completed successfully")
+    except Exception as e:
+        logger.error(f"Error running Phase 4 SQL transformations: {e}")
+        raise
+    
+    logger.info("Starting Phase 5 SQL transformations.")
+    sql_script = """/*SIX SIGMA ANALYSIS*/
 
         DROP VIEW IF EXISTS vw_sigma_analysis;
         CREATE VIEW vw_sigma_analysis AS
@@ -1816,7 +2741,6 @@ def main():
             sigma_level(1 - (CAST(TOTAL_DEFECTS AS FLOAT) / TOTAL_OPPORTUNITIES)) AS SIGMA_LEVEL
         FROM bene_summary_dpmo;
 
-
         CREATE OR REPLACE VIEW vw_sigma_analysis_columns AS 
         -- Final Unified Column-Level Audit
         WITH carrier_columns AS (
@@ -1840,7 +2764,6 @@ def main():
         FROM stacked_results
         GROUP BY src, col
         ORDER BY src, TOTAL_DEFECTS DESC;
-
 
         -- SIX SIGMA ANALYSIS FOR CARRIER CLAIM FIELDS
         CREATE OR REPLACE VIEW vw_sigma_analysis_carrier_columns AS
@@ -1942,9 +2865,17 @@ def main():
         ORDER BY
             TOTAL_DEFECTS DESC,
             DPMO DESC,
-            FIELD_FAMILY ASC;
+            FIELD_FAMILY ASC;"""
+    try:
+        execute_sql_script(sql_script)
+        logger.info("✅ Phase 5 SQL transformations completed successfully")
+    except Exception as e:
+        logger.error(f"Error running Phase 5 SQL transformations: {e}")
+        raise
 
-        -- Financial Impact Summary
+    
+    logger.info("Starting Phase 6 SQL transformations.")
+    sql_script = """-- Financial Impact Summary
         CREATE OR REPLACE VIEW vw_claim_financial_error_impact AS
         WITH base AS (
             SELECT 
@@ -1991,9 +2922,23 @@ def main():
             / sum(FINANCIAL_VARIANCE) OVER () AS RUNNING_PCT_OF_TOTAL
         FROM base
         ORDER BY FINANCIAL_VARIANCE DESC;"""
-    
-    execute_sql_script(sql_script)
-    print("✅ Transform completed: Views and audit tables created successfully")
+    try:
+        execute_sql_script(sql_script)
+        logger.info("✅ Phase 6 SQL transformations completed successfully")
+    except Exception as e:
+        logger.error(f"Error running Phase 5 SQL transformations: {e}")
+        raise
 
+    logger.info("Starting Database Compression (Vacuum).")
+    sql_script = """vacuum;"""
+    try:
+        execute_sql_script(sql_script)
+        logger.info("✅ Database Compression (Vacuum) completed successfully")
+    except Exception as e:
+        logger.error(f"Error running Database Compression (Vacuum): {e}")
+        #raise
+
+    print("✅ Transform completed: Views and audit tables created successfully")
+    
 if __name__ == "__main__":
     main()

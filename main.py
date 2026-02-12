@@ -52,7 +52,7 @@ def main():
         run_transform()
         logger.info("✅ Transformation complete")
 
-    if args.all or args.ingest or args.validate or args.transform or args.compare or args.report:
+    if args.all or args.ingest or args.validate or args.transform or args.compare:
         logger.info("Running comparison...")
         run_comparison()
         logger.info("✅ Comparison complete")
