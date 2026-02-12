@@ -1,9 +1,47 @@
 from src.db import execute_sql_script
+import os
+import logging
+
+# Import lookup table functions
+import sys
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from scripts.add_lookups import create_lookups
+from scripts.ingest_formulas import ingest_formulas
+from scripts.ingest_labels import ingest_labels
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # Get the project root directory (parent of src/)
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def main():
+    logger.info("Loading lookup tables...")
+    
+    # Load lookup tables BEFORE running SQL transformations
+    try:
+        create_lookups()
+        logger.info("✅ Lookup tables created successfully")
+    except Exception as e:
+        logger.error(f"Error creating lookup tables: {e}")
+        raise
+    
+    try:
+        ingest_formulas()
+        logger.info("✅ Payment formulas ingested successfully")
+    except Exception as e:
+        logger.error(f"Error ingesting formulas: {e}")
+        raise
+    
+    try:
+        ingest_labels()
+        logger.info("✅ Variable labels ingested successfully")
+    except Exception as e:
+        logger.error(f"Error ingesting labels: {e}")
+        raise
+    
+    logger.info("Starting SQL transformations...")
+    
     sql_script = """CREATE OR REPLACE FUNCTION sigma_level(p_yield) AS (
             -- This is a standard approximation for the Inverse Normal Distribution
             -- combined with your 1.5 Sigma Shift

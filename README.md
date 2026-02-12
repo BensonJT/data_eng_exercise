@@ -20,16 +20,23 @@ The pipeline consists of four main stages executed in sequence:
    - Loads 10 CSV files (5 source + 5 new system) into database
    - **Uses chunked streaming** (10,000 rows per batch) for memory efficiency
    - Processes files iteratively without loading entire datasets into memory
-   - Automatically triggers transformation after ingestion
+   - Transformation runs automatically after ingestion (unless using --validate)
 
-3. **Transform** (automatic after ingest)
+3. **Validate Ingestion** (`--validate`) - *Optional but recommended*
+   - Validates data was ingested correctly by comparing database sums to CSV file sums
+   - Should be run AFTER `--ingest` and BEFORE transformation
+   - Checks 4 key metrics across source and new system datasets
+   - Helps catch any data corruption or incomplete ingestion early
+
+4. **Transform** (automatic after ingest, or explicit before compare)
+   - **Loads lookup tables** (state codes, sex codes, race codes, payment formulas, variable labels)
    - Creates analytical views and audit tables
    - Performs complex SQL transformations
    - Prepares data for comparison
 
-4. **Compare & Report** (`--compare`, `--report`)
+5. **Compare & Report** (`--compare`, `--report`)
    - Executes comparison logic across multiple dimensions
-   - Generates 13 output CSV files with detailed analysis
+   - Generates 17 output CSV files with detailed analysis
    - Creates Markdown and HTML reports
 
 ### Technology Stack
@@ -152,11 +159,13 @@ python main.py --all
 This will:
 1. Initialize the database and create tables
 2. Ingest all 10 CSV files
-3. Run transformation to create analytical views
-4. Execute comparison logic
-5. Generate both Markdown and HTML reports
+3. **Validate the ingestion** (optional but recommended)
+4. **Load lookup tables** (state, sex, race codes, formulas, labels)
+5. Run transformation to create analytical views
+6. Execute comparison logic
+7. Generate both Markdown and HTML reports
 
-**Expected Runtime**: 3 - 5 hours depending on system performance fo initial run (-- all)
+**Expected Runtime**: 4 - 6 hours depending on system performance for initial run (-- all)
 
 ### Run Individual Stages
 
@@ -164,17 +173,42 @@ For development or troubleshooting, you can run stages separately:
 
 ```bash
 # Initialize database only
-python main.py --init-db  
+ python main.py --init-db  
 
 # Ingest data and run transformations
 python main.py --ingest
 
-# Run comparison only (requires data to be ingested)
+# Validate ingestion (AFTER --ingest, BEFORE transformation)
+# This is optional but recommended to ensure data integrity
+python main.py --validate
+
+# Run comparison only (requires data to be ingested and transformed)
 python main.py --compare
 
 # Generate reports only
 python main.py --report
 ```
+
+> **Note**: The `--validate` flag should be run **after** `--ingest` but **before** any comparison or reporting. It validates that CSV data was correctly loaded into the database by comparing checksums.
+
+### Recommended Workflow for First-Time Users
+
+1. **Initialize and Ingest**:
+   ```bash
+   python main.py --init-db --ingest
+   ```
+
+2. **Validate** (recommended before proceeding):
+   ```bash
+   python main.py --validate
+   ```
+   - If validation passes, proceed to comparison
+   - If validation fails, check `.env` paths and re-run `--ingest`
+
+3. **Compare and Report**:
+   ```bash
+   python main.py --compare --report
+   ```
 
 ## Output Files
 
@@ -192,14 +226,14 @@ Provides details for manual exploration of the data analysis, including deep div
    - Total Defects is the aggregated count of all fields that do not match between the source and new systems (excludes key fields)
    - Total Opportunities are the sum total of all fields on every row (excludes key fields)
    - DPMO is Defects Per Million Opportunities:
-   - DPMO = ((Total Defects / Total Opportunities) × 1,000,000)
+      - DPMO = ((Total Defects / Total Opportunities) × 1,000,000)
    - Process Yield is the percentage of opportunities that are defect free 
-   - Yield = (((Total Opportunities - Total Defects) / Total Opportunities) * 100)
+      - Yield = (((Total Opportunities - Total Defects) / Total Opportunities) * 100)
    - Sigma Level is the number of standard deviations from the mean (3 is 6 sigma) 
-   - Z-Score = Φ⁻¹(Yield)  # Inverse Normal CDF
-      - Where: Φ⁻¹ (Phi inverse) = Inverse of the Standard Normal Cumulative Distribution Function
-      - And 1.5 sigma shift = Standard industry adjustment for long-term process drift
-   - Sigma Level = Z-score + 1.5
+      - Z-Score = Φ⁻¹(Yield)  # Inverse Normal CDF
+         - Where: Φ⁻¹ (Phi inverse) = Inverse of the Standard Normal Cumulative Distribution Function
+         - And 1.5 sigma shift = Standard industry adjustment for long-term process drift
+      - Sigma Level = Z-score + 1.5
 
 2. **`six_sigma_carrier.csv`** - Field-level six sigma analysis for carrier claims
    - Shows quality metrics for each claim field grouped by field family
@@ -371,7 +405,7 @@ data_eng/
 - **Ingestion**: Processes ~10M rows total across all files
 - **Transformation**: Creates 50+ analytical views and audit tables
 - **Comparison**: Executes complex (advanced) SQL joins and aggregations
-- **Expected Total Runtime**: 3 - 5 hours on average personal computers (depends on system performance)
+- **Expected Total Runtime**: 4 - 6 hours on average personal computers (depends on system performance)
 
 ## Additional Resources
 

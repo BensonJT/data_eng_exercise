@@ -1,7 +1,11 @@
 import sys
 import os
 import pandas as pd
+from dotenv import load_dotenv
 from sqlalchemy.orm import Session
+
+# Load environment variables
+load_dotenv()
 
 # Add project root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -16,7 +20,15 @@ def ingest_labels():
     LookupVariableLabels.__table__.drop(engine, checkfirst=True)
     Base.metadata.create_all(bind=engine)
     
-    csv_path = "/mnt/e/Data Eng Exercise/lookup_variable_labels.csv"
+    # Get source data directory from environment variable
+    source_data_dir = os.getenv('SOURCE_DATA_DIR')
+    if not source_data_dir:
+        raise ValueError(
+            "SOURCE_DATA_DIR environment variable is not set. "
+            "Please configure .env file."
+        )
+    
+    csv_path = os.path.join(source_data_dir, "lookup_variable_labels.csv")
     if not os.path.exists(csv_path):
         print(f"Error: File not found at {csv_path}")
         return
