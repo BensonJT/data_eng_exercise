@@ -1,6 +1,10 @@
 import pandas as pd
 import sys
 import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Add project root to python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -72,21 +76,54 @@ def ingest_csv(file_path, model_class, year=None, extra_cols=None):
         logger.error(f"Failed to ingest {file_path}: {e}")
 
 def run_ingestion():
-    # Source Data Paths
-    src_bene_2008 = "/mnt/e/Data Eng Exercise/source/DE1_0_2008_Beneficiary_Summary_File_Sample_1.csv"
-    src_bene_2009 = "/mnt/e/Data Eng Exercise/source/DE1_0_2009_Beneficiary_Summary_File_Sample_1.csv"
-    src_bene_2010 = "/mnt/e/Data Eng Exercise/source/DE1_0_2010_Beneficiary_Summary_File_Sample_1.csv"
+    # Load data directories from environment variables
+    source_data_dir = os.getenv('SOURCE_DATA_DIR')
+    new_data_dir = os.getenv('NEW_DATA_DIR')
     
-    src_claims_a = "/mnt/e/Data Eng Exercise/source/DE1_0_2008_to_2010_Carrier_Claims_Sample_1A.csv"
-    src_claims_b = "/mnt/e/Data Eng Exercise/source/DE1_0_2008_to_2010_Carrier_Claims_Sample_1B.csv"
+    # Validate that required environment variables are set
+    if not source_data_dir:
+        raise ValueError(
+            "SOURCE_DATA_DIR environment variable is not set. "
+            "Please copy .env.example to .env and configure the source data directory."
+        )
+    
+    if not new_data_dir:
+        raise ValueError(
+            "NEW_DATA_DIR environment variable is not set. "
+            "Please copy .env.example to .env and configure the new system data directory."
+        )
+    
+    # Validate that directories exist
+    if not os.path.isdir(source_data_dir):
+        raise FileNotFoundError(
+            f"Source data directory not found: {source_data_dir}\n"
+            "Please ensure the SOURCE_DATA_DIR path in .env points to a valid directory."
+        )
+    
+    if not os.path.isdir(new_data_dir):
+        raise FileNotFoundError(
+            f"New system data directory not found: {new_data_dir}\n"
+            "Please ensure the NEW_DATA_DIR path in .env points to a valid directory."
+        )
+    
+    logger.info(f"Source data directory: {source_data_dir}")
+    logger.info(f"New system data directory: {new_data_dir}")
+    
+    # Source Data Paths - construct from base directory
+    src_bene_2008 = os.path.join(source_data_dir, "DE1_0_2008_Beneficiary_Summary_File_Sample_1.csv")
+    src_bene_2009 = os.path.join(source_data_dir, "DE1_0_2009_Beneficiary_Summary_File_Sample_1.csv")
+    src_bene_2010 = os.path.join(source_data_dir, "DE1_0_2010_Beneficiary_Summary_File_Sample_1.csv")
+    
+    src_claims_a = os.path.join(source_data_dir, "DE1_0_2008_to_2010_Carrier_Claims_Sample_1A.csv")
+    src_claims_b = os.path.join(source_data_dir, "DE1_0_2008_to_2010_Carrier_Claims_Sample_1B.csv")
 
-    # New System Data Paths
-    new_bene_2008 = "/mnt/e/Data Eng Exercise/new/DE1_0_2008_Beneficiary_Summary_File_Sample_1_NEWSYSTEM.csv"
-    new_bene_2009 = "/mnt/e/Data Eng Exercise/new/DE1_0_2009_Beneficiary_Summary_File_Sample_1_NEWSYSTEM.csv"
-    new_bene_2010 = "/mnt/e/Data Eng Exercise/new/DE1_0_2010_Beneficiary_Summary_File_Sample_1_NEWSYSTEM.csv"
+    # New System Data Paths - construct from base directory
+    new_bene_2008 = os.path.join(new_data_dir, "DE1_0_2008_Beneficiary_Summary_File_Sample_1_NEWSYSTEM.csv")
+    new_bene_2009 = os.path.join(new_data_dir, "DE1_0_2009_Beneficiary_Summary_File_Sample_1_NEWSYSTEM.csv")
+    new_bene_2010 = os.path.join(new_data_dir, "DE1_0_2010_Beneficiary_Summary_File_Sample_1_NEWSYSTEM.csv")
 
-    new_claims_a = "/mnt/e/Data Eng Exercise/new/DE1_0_2008_to_2010_Carrier_Claims_Sample_1A_NEWSYSTEM.csv"
-    new_claims_b = "/mnt/e/Data Eng Exercise/new/DE1_0_2008_to_2010_Carrier_Claims_Sample_1B_NEWSYSTEM.csv"
+    new_claims_a = os.path.join(new_data_dir, "DE1_0_2008_to_2010_Carrier_Claims_Sample_1A_NEWSYSTEM.csv")
+    new_claims_b = os.path.join(new_data_dir, "DE1_0_2008_to_2010_Carrier_Claims_Sample_1B_NEWSYSTEM.csv")
 
     # Ingest Source Beneficiary Data
     ingest_csv(src_bene_2008, SrcBeneficiarySummary, year=2008)

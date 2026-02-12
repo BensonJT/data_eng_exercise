@@ -8,7 +8,8 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from scripts.create_tables import create_tables
 from src.ingest import run_ingestion
-from src.compare import run_comparison, compare_beneficiaries, compare_claims
+from src.transform import main as run_transform
+from src.compare import run_comparison, compare_beneficiaries, compare_claims, calc_six_sigma, calc_financial_impact
 from src.report import generate_report_md
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -35,22 +36,62 @@ def main():
     if args.all or args.ingest:
         logger.info("Running data ingestion...")
         run_ingestion()
+        
+        # Automatically run transformation after ingestion
+        logger.info("Running data transformation (creating views and audit tables)...")
+        run_transform()
 
     if args.all or args.compare or args.report:
         logger.info("Running comparison...")
-        # We need the results for the report, so we capture them
-        print("Comparing Beneficiaries...")
-        bene_res = compare_beneficiaries()
-        print("Comparing Claims...")
-        claims_res = compare_claims()
+        run_comparison()
         
-        # Print summary to console
-        print(f"Beneficiary Discrepancies: {bene_res['mismatch_count']}")
-        print(f"Claims Payment Discrepancies: {claims_res['payment_mismatch_count']}")
-
+        six_sigma_res = calc_six_sigma()
+        print("\n--- Six Sigma Analysis ---")
+        print(f"Six Sigma: {six_sigma_res}")
+        print(f"Six Sigma Carrier: {six_sigma_res['six_sigma_carrier']}")
+        print(f"Six Sigma Beneficiary: {six_sigma_res['six_sigma_beneficiary']}")
+        
+        financial_impact_res = calc_financial_impact()
+        print("\n--- Financial Impact Analysis ---")
+        print(f"Financial Impact Claim: {financial_impact_res['financial_impact_claim']}")
+        print(f"Financial Impact Beneficiary: {financial_impact_res['financial_impact_beneficiary']}")
+        
+        print("\n--- Beneficiary Comparison ---")
+        bene_res = compare_beneficiaries()
+        print(f"Records with Discrepancies: {bene_res['bene_records_with_discrepancies']}")
+        print(f"Missing Beneficiaries in New: {bene_res['missing_count']}")
+        print(f"Extra Beneficiaries in New: {bene_res['extra_sample']}")
+        print(f"Mismatched Beneficiary Attributes: {bene_res['mismatch_count']}")
+        print(f"Beneficiary Date Differences: {bene_res['date_diff_count']}")
+        print(f"Comprehensive Beneficiary Differences: {bene_res['comprehensive_beneficiary_count']}")
+        print(f"Missing Beneficiary Sample: {bene_res['missing_sample']}")
+        print(f"Beneficiary Date Changes: {bene_res['bene_date_changes']}")
+        print(f"Mismatch Sample: {bene_res['mismatch_sample']}")
+        print(f"Comprehensive Beneficiary Sample: {bene_res['comprehensive_sample']}")
+        print(f"Records with Discrepancies Sample: {bene_res['bene_records_with_discrepancies_sample']}")
+        
+        print("\n--- Claims Comparison ---")
+        claims_res = compare_claims()
+        print(f"Records with Discrepancies: {claims_res['claim_records_with_discrepancies']}")
+        print(f"Missing Claims in New: {claims_res['missing_claims_count']}")
+        print(f"Payment Mismatches: {claims_res['payment_mismatch_count']}")
+        print(f"Compreh ensive Orphan Claims: {claims_res['comprehensive_orphan_claims_count']}")
+        print(f"Payment Mismatch Sample: {claims_res['payment_mismatch_sample']}")
+        print(f"Comprehensive Orphan Claims Sample: {claims_res['comprehensive_orphan_claims_sample']}")
+        print(f"Records with Discrepancies Sample: {claims_res['claim_records_with_discrepancies_sample']}")
+        
         if args.all or args.report:
             logger.info("Generating report...")
-            generate_report_md(bene_res, claims_res)
+            generate_report_md(bene_res, claims_res, six_sigma_res, financial_impact_res)
+            
+            # Also generate HTML version
+            logger.info("Generating HTML report...")
+            import subprocess
+            try:
+                subprocess.run(["python3", "convert_report_to_html.py"], check=True, cwd=os.path.dirname(os.path.abspath(__file__)))
+                logger.info("✅ Both reports generated: report.md and report.html")
+            except Exception as e:
+                logger.warning(f"HTML conversion failed: {e}. Markdown report still available.")
 
 if __name__ == "__main__":
     main()

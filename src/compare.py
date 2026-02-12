@@ -1,4 +1,6 @@
 import pandas as pd
+import numpy as np
+from scipy import stats
 from sqlalchemy import text
 from src.db import engine
 from src.db import execute_sql_script
@@ -7,6 +9,35 @@ import os
 # Get the project root directory (parent of src/)
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 data_dir = os.path.join(project_root, "data")
+
+def accurate_sigma_level(yield_value):
+    """
+    Calculate accurate Six Sigma level using scipy's inverse normal distribution.
+    
+    Args:
+        yield_value: Proportion of defect-free items (0 to 1)
+    
+    Returns:
+        float: Six Sigma level (typically 0 to 6+)
+    
+    Note:
+        This replaces the SQL approximation with the precise inverse normal CDF.
+        The 1.5 sigma shift is a standard industry adjustment for long-term drift.
+    """
+    if pd.isna(yield_value) or yield_value <= 0 or yield_value >= 1:
+        return np.nan
+    
+    try:
+        # Calculate Z-score from yield using inverse normal CDF
+        # stats.norm.ppf gives us the inverse of the normal cumulative distribution
+        z_score = stats.norm.ppf(yield_value)
+        
+        # Apply 1.5 sigma shift (standard Six Sigma methodology)
+        sigma_level = z_score + 1.5
+        
+        return sigma_level
+    except (ValueError, FloatingPointError):
+        return np.nan
 
 def get_row_counts():
     """Returns row counts for all tables."""
@@ -23,14 +54,27 @@ def get_row_counts():
 
 def calc_six_sigma():
     """
-    Calculate Six Sigma to score Data Migration Quality
+    Calculate Six Sigma to score Data Migration Quality.
+    Recalculates sigma values using accurate scipy inverse normal distribution.
     """
     with engine.connect() as conn:
+
+        schema_query = text("""
+            select * from vw_db_schema order by table_name, column_name
+        """)
+        schema_df = pd.read_sql(schema_query, conn)
+        schema_df.to_csv(os.path.join(data_dir, "schema.csv"), index=False)
+        
         # 1. Overall Six Sigma Analysis
         six_sigma_query = text("""
             select * from vw_sigma_analysis
         """)
         six_sigma_df = pd.read_sql(six_sigma_query, conn)
+        
+        # Recalculate SIX_SIGMA using accurate Python function
+        if 'YIELD' in six_sigma_df.columns:
+            six_sigma_df['SIX_SIGMA'] = six_sigma_df['YIELD'].apply(accurate_sigma_level)
+        
         six_sigma_df.to_csv(os.path.join(data_dir, "six_sigma.csv"), index=False)
         
         # 2. Six Sigma Analysis for Carrier Claim Fields
@@ -38,6 +82,11 @@ def calc_six_sigma():
             select * from vw_sigma_analysis_carrier_columns;
         """)
         six_sigma_carrier_df = pd.read_sql(six_sigma_carrier_query, conn)
+        
+        # Recalculate SIX_SIGMA using accurate Python function
+        if 'YIELD' in six_sigma_carrier_df.columns:
+            six_sigma_carrier_df['SIX_SIGMA'] = six_sigma_carrier_df['YIELD'].apply(accurate_sigma_level)
+        
         six_sigma_carrier_df.to_csv(os.path.join(data_dir, "six_sigma_carrier.csv"), index=False)
 
         # 3. Six Sigma Analysis for Beneficiary Fields
@@ -45,7 +94,24 @@ def calc_six_sigma():
             select * from vw_sigma_analysis_beneficiary_columns
         """)
         six_sigma_beneficiary_df = pd.read_sql(six_sigma_beneficiary_query, conn)
+        
+        # Recalculate SIX_SIGMA using accurate Python function
+        if 'YIELD' in six_sigma_beneficiary_df.columns:
+            six_sigma_beneficiary_df['SIX_SIGMA'] = six_sigma_beneficiary_df['YIELD'].apply(accurate_sigma_level)
+        
         six_sigma_beneficiary_df.to_csv(os.path.join(data_dir, "six_sigma_beneficiary.csv"), index=False)
+        
+        # 4. Six Sigma Analysis for All Fields (not grouped)
+        six_sigma_columns_query = text("""
+            select * from vw_sigma_analysis_columns
+        """)
+        six_sigma_columns_df = pd.read_sql(six_sigma_columns_query, conn)
+        
+        # Recalculate SIX_SIGMA using accurate Python function
+        if 'YIELD' in six_sigma_columns_df.columns:
+            six_sigma_columns_df['SIX_SIGMA'] = six_sigma_columns_df['YIELD'].apply(accurate_sigma_level)
+        
+        six_sigma_columns_df.to_csv(os.path.join(data_dir, "six_sigma_columns.csv"), index=False)
         
     return {
         "six_sigma": six_sigma_df,
@@ -117,7 +183,16 @@ def compare_beneficiaries():
         """)
         comprehensive_df = pd.read_sql(comprehensive_query, conn)
         comprehensive_df.to_csv(os.path.join(data_dir, "comprehensive_beneficiary_differences.csv"), index=False)        
+
+        # 6. Audit Beneficiary Summary
+        audit_beneficiary_query = text("""
+            select * from vw_beneficiary_audit_summary
+        """)
+        audit_beneficiary_df = pd.read_sql(audit_beneficiary_query, conn)
+        audit_beneficiary_df.to_csv(os.path.join(data_dir, "audit_beneficiary_summary.csv"), index=False)
+    
     return {
+        "bene_records_with_discrepancies": len(audit_beneficiary_df),
         "missing_count": len(missing_df_1) + len(missing_df_2),
         "mismatch_count": len(mismatch_df),
         "date_diff_count": len(date_diff_df),
@@ -126,7 +201,8 @@ def compare_beneficiaries():
         "extra_sample": missing_df_2.head(),
         "bene_date_changes": date_diff_df.head(),
         "mismatch_sample": mismatch_df.head(),
-        "comprehensive_sample": comprehensive_df.head()
+        "comprehensive_sample": comprehensive_df.head(),
+        "bene_records_with_discrepancies_sample": audit_beneficiary_df.head()
     }
 
 def compare_claims():
@@ -155,12 +231,22 @@ def compare_claims():
         """)
         comprehensive_orphan_claims_df = pd.read_sql(comprehensive_orphan_claims, conn)
         comprehensive_orphan_claims_df.to_csv(os.path.join(data_dir, "comprehensive_orphan_claims.csv"), index=False)
+
+        # 4. Audit Claim Summary
+        audit_claim_query = text("""
+            select * from audit_carrier_claims
+        """)
+        audit_claim_df = pd.read_sql(audit_claim_query, conn)
+        audit_claim_df.to_csv(os.path.join(data_dir, "audit_claim_summary.csv"), index=False)
+
     return {
+        "claim_records_with_discrepancies": len(audit_claim_df),
         "missing_claims_count": len(missing_df),
         "payment_mismatch_count": len(payment_diff_df_sample),
         "comprehensive_orphan_claims_count": len(comprehensive_orphan_claims_df),
         "payment_mismatch_sample": payment_diff_df_sample.head(),
-        "comprehensive_orphan_claims_sample": comprehensive_orphan_claims_df.head()
+        "comprehensive_orphan_claims_sample": comprehensive_orphan_claims_df.head(),
+        "claim_records_with_discrepancies_sample": audit_claim_df.head()
     }
 
 def run_comparison():
@@ -169,37 +255,6 @@ def run_comparison():
     for table, count in counts.items():
         print(f"{table}: {count}")
         
-    six_sigma_res = calc_six_sigma()
-    print("\n--- Six Sigma Analysis ---")
-    print(f"Six Sigma: {six_sigma_res}")
-    print(f"Six Sigma Carrier: {six_sigma_res['six_sigma_carrier']}")
-    print(f"Six Sigma Beneficiary: {six_sigma_res['six_sigma_beneficiary']}")
-    
-    financial_impact_res = calc_financial_impact()
-    print("\n--- Financial Impact Analysis ---")
-    print(f"Financial Impact Claim: {financial_impact_res['financial_impact_claim']}")
-    print(f"Financial Impact Beneficiary: {financial_impact_res['financial_impact_beneficiary']}")
-    
-    print("\n--- Beneficiary Comparison ---")
-    bene_res = compare_beneficiaries()
-    print(f"Missing Beneficiaries in New: {bene_res['missing_count']}")
-    print(f"Extra Beneficiaries in New: {bene_res['extra_count']}")
-    print(f"Mismatched Beneficiary Attributes: {bene_res['mismatch_count']}")
-    print(f"Beneficiary Date Differences: {bene_res['date_diff_count']}")
-    print(f"Comprehensive Beneficiary Differences: {bene_res['comprehensive_beneficiary_count']}")
-    print(f"Missing Beneficiary Sample: {bene_res['missing_sample']}")
-    print(f"Beneficiary Date Changes: {bene_res['bene_date_changes']}")
-    print(f"Mismatch Sample 1: {bene_res['mismatch_sample_1']}")
-    print(f"Mismatch Sample 2: {bene_res['mismatch_sample_2']}")
-    print(f"Comprehensive Beneficiary Sample: {bene_res['comprehensive_sample']}")
-    
-    print("\n--- Claims Comparison ---")
-    claims_res = compare_claims()
-    print(f"Missing Claims in New: {claims_res['missing_claims_count']}")
-    print(f"Payment Mismatches: {claims_res['payment_mismatch_count']}")
-    print(f"Compreh ensive Orphan Claims: {claims_res['comprehensive_orphan_claims_count']}")
-    print(f"Payment Mismatch Sample: {claims_res['payment_mismatch_sample']}")
-    print(f"Comprehensive Orphan Claims Sample: {claims_res['comprehensive_orphan_claims_sample']}")
 
 if __name__ == "__main__":
     run_comparison()
