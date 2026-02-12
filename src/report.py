@@ -237,7 +237,7 @@ def generate_report_md(bene_res, claims_res, six_sigma_res, financial_impact_res
         f.write(f"| Attribute Mismatches | {bene_res['mismatch_count']:,} | [beneficiary_attribute_mismatches.csv](data/beneficiary_attribute_mismatches.csv) |\n")
         f.write(f"| Date Differences (DOB/DOD) | {bene_res['date_diff_count']:,} | [beneficiary_date_differences.csv](data/beneficiary_date_differences.csv) |\n")
         f.write(f"| Comprehensive Line Differences | {bene_res['comprehensive_beneficiary_count']:,} | [comprehensive_beneficiary_differences.csv](data/comprehensive_beneficiary_differences.csv) |\n")
-        f.write(f"| Beneficiary Audit Sample | {bene_res['bene_records_with_discrepancies_sample']:,} | [bene_records_with_discrepancies_sample.csv](data/audit_beneficiary_summary.csv) |\n")
+        f.write(f"| Beneficiary Audit Sample | {bene_res['bene_records_with_discrepancies']:,} | [audit_beneficiary_summary.csv](data/audit_beneficiary_summary.csv) |\n")
         f.write("\n")
         
         if bene_res['mismatch_count'] > 0:
@@ -314,7 +314,7 @@ def generate_report_md(bene_res, claims_res, six_sigma_res, financial_impact_res
         f.write(f"| Missing Claims | {claims_res['missing_claims_count']:,} | [missing_claims.csv](data/missing_claims.csv) |\n")
         f.write(f"| Payment Amount Discrepancies | {claims_res['payment_mismatch_count']:,} | [claim_payment_amount_discrepancies.csv](data/claim_payment_amount_discrepancies.csv) |\n")
         f.write(f"| Orphan Claims (4-way match) | {claims_res['comprehensive_orphan_claims_count']:,} | [comprehensive_orphan_claims.csv](data/comprehensive_orphan_claims.csv) |\n")
-        f.write(f"| Claim Audit Sample | {claims_res['claim_records_with_discrepancies_sample']:,} | [claim_records_with_discrepancies_sample.csv](data/audit_claim_summary.csv) |\n")
+        f.write(f"| Claim Audit Sample | {claims_res['claim_records_with_discrepancies']:,} | [claim_records_with_discrepancies_sample.csv](data/audit_claim_summary.csv) |\n")
         f.write("\n")
         
         if claims_res['payment_mismatch_count'] > 0:
