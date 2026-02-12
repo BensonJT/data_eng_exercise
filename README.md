@@ -165,7 +165,7 @@ This will:
 6. Execute comparison logic
 7. Generate both Markdown and HTML reports
 
-**Expected Runtime**: 4 - 6 hours depending on system performance for initial run (-- all)
+**Expected Runtime**: 6 - 8 hours depending on system performance for initial run (-- all)
 
 ### Run Individual Stages
 
@@ -405,7 +405,7 @@ data_eng/
 - **Ingestion**: Processes ~10M rows total across all files
 - **Transformation**: Creates 50+ analytical views and audit tables
 - **Comparison**: Executes complex (advanced) SQL joins and aggregations
-- **Expected Total Runtime**: 4 - 6 hours on average personal computers (depends on system performance)
+- **Expected Total Runtime**: 6 - 8 hours on average personal computers (depends on system performance)
 
 ## Additional Resources
 
