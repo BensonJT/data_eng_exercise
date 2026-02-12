@@ -21,6 +21,7 @@ def main():
     parser.add_argument("--init-db", action="store_true", help="Initialize the database tables")
     parser.add_argument("--ingest", action="store_true", help="Run data ingestion")
     parser.add_argument("--validate", action="store_true", help="Validate ingestion (run after --ingest, before transformation)")
+    parser.add_argument("--transform", action="store_true", help="Run data transformation (run after --ingest, before comparison)")
     parser.add_argument("--compare", action="store_true", help="Run data comparison")
     parser.add_argument("--report", action="store_true", help="Generate report")
     parser.add_argument("--all", action="store_true", help="Run full pipeline (init, ingest, validate, transform, compare, report)")
@@ -45,7 +46,9 @@ def main():
         logger.info("✅ Validation complete")
         
     # Only run transformation if we've completed ingestion (and optionally validation)
-    if args.all or (not args.validate and args.ingest):
+    if args.all or (not args.validate and args.ingest) 
+        or (args.validate and not args.ingest)
+        or (args.transform):
         # Automatically run transformation after ingestion
         logger.info("Running data transformation (creating views and audit tables)...")
         run_transform()
