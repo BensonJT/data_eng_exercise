@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def main():
-    '''
+    
     logger.info("Loading lookup tables...")
     
     # Load lookup tables BEFORE running SQL transformations
@@ -483,7 +483,7 @@ def main():
         logger.info("✅ Phase 2 SQL transformations completed successfully")
     except Exception as e:
         logger.error(f"Error running Phase 2 SQL transformations: {e}")
-        raise'''
+        raise
 
     logger.info("Starting Phase 3 SQL transformations.")
     sql_script = """
@@ -1939,7 +1939,7 @@ def main():
             logger.error(f"Error running Phase 3c12 SQL transformations: {e}")
             raise
 
-    logger.info("Starting Phase 3c13 SQL transformations.")
+    logger.info("Starting Phase 3 Index/Analyze.")
     sql_script = """
         CREATE INDEX idx_audit_carrier_claims_keys 
             ON audit_carrier_claims (DESYNPUF_ID, CLM_ID, CLM_FROM_DT, CLM_THRU_DT);
@@ -1947,9 +1947,9 @@ def main():
         """
     try:
         execute_sql_script(sql_script)
-        logger.info("✅ Phase 3c13 SQL transformations completed successfully")
+        logger.info("✅ Phase 3 Index/Analyzes completed successfully")
     except Exception as e:
-        logger.error(f"Error running Phase 3c13 SQL transformations: {e}")
+        logger.error(f"Error running Phase 3 Index/Analyze: {e}")
         raise
 
     logger.info("Starting Phase 4 SQL transformations.")

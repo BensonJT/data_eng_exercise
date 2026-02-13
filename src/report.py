@@ -294,7 +294,7 @@ def generate_report_md(bene_res, claims_res, six_sigma_res, financial_impact_res
         f.write("  - Cross-reference DESYNPUF_IDs with the other CSVs to understand root causes\n")
         f.write("  - Use for detailed reconciliation and auditing\n\n")
 
-        f.write("**6. [audit_beneficiary_summary.csv](data/audit_beneficiary_summary.csv)** ({:,} records)\n\n".format(bene_res['bene_records_with_discrepancies_sample']))
+        f.write("**6. [audit_beneficiary_summary.csv](data/audit_beneficiary_summary.csv)** ({:,} records)\n\n".format(bene_res['bene_records_with_discrepancies']))
         f.write("- **Columns**: All 33 claim summary fields (DESYNPUF_ID, YEAR, demographics, coverage, conditions, financials)\n")
         f.write("- **What it shows**: ANY row where ANY field differs between source and new (SQL EXCEPT operation)\n")
         f.write("- **Size**: Largest claim CSV - this is your master list of all differences (0 equals match, 1 equals no match)\n")
@@ -364,7 +364,7 @@ def generate_report_md(bene_res, claims_res, six_sigma_res, financial_impact_res
         f.write("  - Look for CLM_FROM_DT = '20231332' (invalid dates that should be '20080304')\n")
         f.write("  - These claims may need manual reconciliation or reprocessing\n\n")
 
-        f.write("**4. [audit_claim_summary.csv](data/audit_claim_summary.csv)** ({:,} records)\n\n".format(claims_res['claim_records_with_discrepancies_sample']))
+        f.write("**4. [audit_claim_summary.csv](data/audit_claim_summary.csv)** ({:,} records)\n\n".format(claims_res['claim_records_with_discrepancies']))
         f.write("- **Columns**: All 142 carrier claim fields (DESYNPUF_ID, CLM_ID, CLM_FROM_DT, CLM_THRU_DT, diagnosis codes, procedures, NPIs, financials, etc.)\n")
         f.write("- **What it shows**: ANY row where ANY field differs between source and new (SQL EXCEPT operation)\n")
         f.write("- **Size**: Largest claim CSV - this is your master list of all claim-level differences (0 equals match, 1 equals no match)\n")

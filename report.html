@@ -149,12 +149,12 @@
 <tr>
 <td>Carrier Claims Quality</td>
 <td>4.58σ (1,095 DPMO, 99.89% yield)</td>
-<td class="status-excellent">✅ Excellent</td>
+<td>☑️ Good</td>
 </tr>
 <tr>
 <td>Beneficiary Summary Quality</td>
 <td>4.68σ (768 DPMO, 99.92% yield)</td>
-<td class="status-excellent">✅ Excellent</td>
+<td>☑️ Good</td>
 </tr>
 <tr>
 <td>Missing Beneficiaries</td>
@@ -162,8 +162,18 @@
 <td class="status-critical">❌ Critical</td>
 </tr>
 <tr>
+<td>Beneficiary Records with Defects</td>
+<td class="number-cell">820</td>
+<td class="status-acceptable">⚠️ Review</td>
+</tr>
+<tr>
 <td>Missing Claims</td>
 <td class="number-cell">4,777</td>
+<td class="status-critical">❌ Critical</td>
+</tr>
+<tr>
+<td>Claim Records with Defects</td>
+<td class="number-cell">25,320</td>
 <td class="status-critical">❌ Critical</td>
 </tr>
 <tr>
@@ -225,11 +235,16 @@
 <li>Contains: SUBJECT, TOTAL_UNITS, TOTAL_DEFECTS, TOTAL_OPPORTUNITIES, DPMO, YIELD, SIGMA_LEVEL</li>
 <li>Use this to: Track overall migration quality score and identify which dataset (Carrier Claims vs Beneficiary) needs priority attention</li>
 </ul>
+<ul>
+<li>Defects in the beneficiary dataset may drive defects in the carrier claims dataset</li>
+</ul>
 <p><strong><a href="data/six_sigma_carrier.csv">six_sigma_carrier.csv</a></strong> - Field-level carrier claim defects (102 fields analyzed)</p>
 <ul>
 <li>Contains: SOURCE, FIELD_FAMILY, TOTAL_DEFECTS, TOTAL_OPPORTUNITIES, DPMO, SIGMA_LEVEL</li>
 <li>Use this to: Identify which specific carrier claim fields have the highest error rates</li>
 <li>Fields analyzed include: ICD9 diagnosis codes, NPI identifiers, tax numbers, HCPCS codes, payment amounts, deductibles, coinsurance, processing indicators</li>
+<li>To keep the initial data set higher level, we aggregated the six sigma scores for all fields in a field group together</li>
+<li>CSV files are provided that give the detailed scores per field (without grouping them)</li>
 <li>Sort by TOTAL_DEFECTS descending to prioritize remediation efforts</li>
 </ul>
 <p><strong><a href="data/six_sigma_beneficiary.csv">six_sigma_beneficiary.csv</a></strong> - Field-level beneficiary defects (31 fields analyzed)</p>
@@ -237,7 +252,16 @@
 <li>Contains: SOURCE, FIELD_FAMILY, TOTAL_DEFECTS, TOTAL_OPPORTUNITIES, DPMO, SIGMA_LEVEL</li>
 <li>Use this to: Identify which beneficiary attributes have the highest error rates</li>
 <li>Fields analyzed include: Demographics (birth/death dates, sex, race), coverage months, chronic conditions (11 conditions), financial fields (reimbursements, benefits, payments)</li>
+<li>To keep the initial data set higher level, we aggregated the six sigma scores for all fields in a field group together</li>
+<li>CSV files are provided that give the detailed scores per field (without grouping them)</li>
 <li>Focus on fields with DPMO > 100,000 (below 3σ) for immediate remediation</li>
+</ul>
+<p><strong><a href="data/six_sigma_columns.csv">six_sigma_columns.csv</a></strong> - Field-level carrier claim defects (all fields analyzed except keys)</p>
+<ul>
+<li>Contains: SOURCE, FIELD_FAMILY, TOTAL_DEFECTS, TOTAL_OPPORTUNITIES, DPMO, SIGMA_LEVEL</li>
+<li>Use this to: Identify which specific fields have the highest error rates</li>
+<li>This is the specific CSV that is used to generate the six sigma scores for each field (without grouping them)</li>
+<li>Sort by TOTAL_DEFECTS descending to prioritize remediation efforts, filter on SOURCE to focus on carrier claims or beneficiary</li>
 </ul>
 <h3>Top Defect Fields</h3>
 
@@ -533,6 +557,11 @@
 <td class="number-cell">1,322</td>
 <td>[comprehensive_beneficiary_differences.csv](data/comprehensive_beneficiary_differences.csv)</td>
 </tr>
+<tr>
+<td>Beneficiary Audit Sample</td>
+<td class="number-cell">820</td>
+<td>[audit_beneficiary_summary.csv](data/audit_beneficiary_summary.csv)</td>
+</tr>
 </tbody>
 </table>
 <h3>Sample Attribute Mismatches</h3>
@@ -631,6 +660,7 @@
 <li><strong>Columns</strong>: DESYNPUF_ID, src_dob, new_dob, src_dod, new_dod</li>
 <li><strong>What it shows</strong>: Focused view of birth and death date discrepancies</li>
 <li><strong>Common patterns to look for</strong>:</li>
+<li>- Date or attribute changes (not matched)</li>
 <li>- Date format issues (YYYYMMDD vs YYYY-MM-DD)</li>
 <li>- Day/month transposition (01/06 vs 06/01)</li>
 <li>- Year arithmetic errors (+/- 1 year patterns)</li>
@@ -647,6 +677,18 @@
 <li>- Compare financial fields (MEDREIMB_*, BENRES_*, PPPYMT_*) to quantify dollar impact per beneficiary</li>
 <li>- Cross-reference DESYNPUF_IDs with the other CSVs to understand root causes</li>
 <li>- Use for detailed reconciliation and auditing</li>
+</ul>
+<p><strong>6. <a href="data/audit_beneficiary_summary.csv">audit_beneficiary_summary.csv</a></strong> (820 records)</p>
+
+<ul>
+<li><strong>Columns</strong>: All 33 claim summary fields (DESYNPUF_ID, YEAR, demographics, coverage, conditions, financials)</li>
+<li><strong>What it shows</strong>: ANY row where ANY field differs between source and new (SQL EXCEPT operation)</li>
+<li><strong>Size</strong>: Largest claim CSV - this is your master list of all differences (0 equals match, 1 equals no match)</li>
+<li><strong>How to use</strong>:</li>
+<li>- Import into Excel/SQL and pivot by specific columns to find patterns</li>
+<li>- Compare financial fields (MEDREIMB_*, BENRES_*, PPPYMT_*) to quantify volume of defects for each field</li>
+<li>- Cross-reference DESYNPUF_IDs with the other CSVs to understand root causes</li>
+<li>- Use for detailed reconciliation, auditing, and six sigma calculations</li>
 </ul>
 <hr>
 
@@ -678,6 +720,11 @@
 <td>Orphan Claims (4-way match)</td>
 <td class="number-cell">5,242</td>
 <td>[comprehensive_orphan_claims.csv](data/comprehensive_orphan_claims.csv)</td>
+</tr>
+<tr>
+<td>Claim Audit Sample</td>
+<td class="number-cell">25,320</td>
+<td>[claim_records_with_discrepancies_sample.csv](data/audit_claim_summary.csv)</td>
 </tr>
 </tbody>
 </table>
@@ -779,6 +826,18 @@
 <li>- Look for CLM_FROM_DT = '20231332' (invalid dates that should be '20080304')</li>
 <li>- These claims may need manual reconciliation or reprocessing</li>
 </ul>
+<p><strong>4. <a href="data/audit_claim_summary.csv">audit_claim_summary.csv</a></strong> (25,320 records)</p>
+
+<ul>
+<li><strong>Columns</strong>: All 142 carrier claim fields (DESYNPUF_ID, CLM_ID, CLM_FROM_DT, CLM_THRU_DT, diagnosis codes, procedures, NPIs, financials, etc.)</li>
+<li><strong>What it shows</strong>: ANY row where ANY field differs between source and new (SQL EXCEPT operation)</li>
+<li><strong>Size</strong>: Largest claim CSV - this is your master list of all claim-level differences (0 equals match, 1 equals no match)</li>
+<li><strong>How to use</strong>:</li>
+<li>- Import into Excel/SQL and pivot by specific columns to find patterns</li>
+<li>- Compare financial fields (MEDREIMB_*, BENRES_*, PPPYMT_*) to quantify volume of defects for each field</li>
+<li>- Cross-reference DESYNPUF_IDs with the other CSVs to understand root causes</li>
+<li>- Use for detailed reconciliation, auditing, and six sigma calculations</li>
+</ul>
 <hr>
 
 <h2>5. Recommendations</h2>
@@ -791,11 +850,13 @@
 
 <p>4. <strong>DATA LOSS</strong>: 4,777 claims missing in new system. Review ingestion logs and verify source-to-target mapping.</p>
 
+<p>5. <strong>DATA DISCREPANCIES</strong>: 25,320 claims data discrepancies in new system. Review ingestion logs and verify source-to-target mapping at the field level.</p>
+
 <hr>
 
 <h2>Conclusion</h2>
 
-<p>The migration demonstrates <strong>good overall quality</strong> with an average sigma level of 4.63σ. However, address the identified discrepancies before final production cutover.</p>
+<p>The migration demonstrates <strong>good overall quality</strong> with an average sigma level of 4.63σ. Remedial action required.</p>
 
 <p><strong>Next Steps:</strong></p>
 <p>1. Review detailed CSV exports for complete defect lists</p>
