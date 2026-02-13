@@ -1,0 +1,97 @@
+﻿File Source, #, Variable Names, Labels
+Beneficiary Summary, 1, DESYNPUF_ID, DESYNPUF: Beneficiary Code
+Beneficiary Summary, 2, BENE_BIRTH_DT, DESYNPUF: Date of birth
+Beneficiary Summary, 3, BENE_DEATH_DT, DESYNPUF: Date of death
+Beneficiary Summary, 4, BENE_SEX_IDENT_CD, DESYNPUF: Sex
+Beneficiary Summary, 5, BENE_RACE_CD, DESYNPUF: Beneficiary Race Code
+Beneficiary Summary, 6, BENE_ESRD_IND, DESYNPUF: End stage renal disease Indicator
+Beneficiary Summary, 7, SP_STATE_CODE, DESYNPUF: State Code
+Beneficiary Summary, 8, BENE_COUNTY_CD, DESYNPUF: County Code
+Beneficiary Summary, 9, BENE_HI_CVRAGE_TOT_MONS, DESYNPUF: Total number of months of part A coverage for the beneficiary.
+Beneficiary Summary, 10, BENE_SMI_CVRAGE_TOT_MONS, DESYNPUF: Total number of months of part B coverage for the beneficiary.
+Beneficiary Summary, 11, BENE_HMO_CVRAGE_TOT_MONS, DESYNPUF: Total number of months of HMO coverage for the beneficiary.
+Beneficiary Summary, 12, PLAN_CVRG_MOS_NUM, DESYNPUF: Total number of months of part D plan coverage for the beneficiary.
+Beneficiary Summary, 13, SP_ALZHDMTA, DESYNPUF: Chronic Condition: Alzheimer or related disorders or senile
+Beneficiary Summary, 14, SP_CHF, DESYNPUF: Chronic Condition: Heart Failure
+Beneficiary Summary, 15, SP_CHRNKIDN, DESYNPUF: Chronic Condition: Chronic Kidney Disease
+Beneficiary Summary, 16, SP_CNCR, DESYNPUF: Chronic Condition: Cancer
+Beneficiary Summary, 17, SP_COPD, DESYNPUF: Chronic Condition: Chronic Obstructive Pulmonary Disease
+Beneficiary Summary, 18, SP_DEPRESSN, DESYNPUF: Chronic Condition: Depression
+Beneficiary Summary, 19, SP_DIABETES, DESYNPUF: Chronic Condition: Diabetes
+Beneficiary Summary, 20, SP_ISCHMCHT, DESYNPUF: Chronic Condition: Ischemic Heart Disease
+Beneficiary Summary, 21, SP_OSTEOPRS, DESYNPUF: Chronic Condition: Osteoporosis
+Beneficiary Summary, 22, SP_RA_OA, DESYNPUF: Chronic Condition: rheumatoid arthritis and osteoarthritis (RA/OA)
+Beneficiary Summary, 23, SP_STRKETIA, DESYNPUF: Chronic Condition: Stroke/transient Ischemic Attack
+Beneficiary Summary, 24, MEDREIMB_IP, DESYNPUF: Inpatient annual Medicare reimbursement amount
+Beneficiary Summary, 25, BENRES_IP, DESYNPUF: Inpatient annual beneficiary responsibility amount
+Beneficiary Summary, 26, PPPYMT_IP, DESYNPUF: Inpatient annual primary payer reimbursement amount
+Beneficiary Summary, 27, MEDREIMB_OP, DESYNPUF: Outpatient Institutional annual Medicare reimbursement amount
+Beneficiary Summary, 28, BENRES_OP, DESYNPUF: Outpatient Institutional annual beneficiary responsibility amount
+Beneficiary Summary, 29, PPPYMT_OP, DESYNPUF: Outpatient Institutional annual primary payer reimbursement amount
+Beneficiary Summary, 30, MEDREIMB_CAR, DESYNPUF: Carrier annual Medicare reimbursement amount
+Beneficiary Summary, 31, BENRES_CAR, DESYNPUF: Carrier annual beneficiary responsibility amount
+Beneficiary Summary, 32, PPPYMT_CAR, DESYNPUF: Carrier annual primary payer reimbursement amount
+Inpatient Claims, 1, DESYNPUF_ID, DESYNPUF: Beneficiary Code
+Inpatient Claims, 2, CLM_ID, DESYNPUF: Claim ID
+Inpatient Claims, 3, SEGMENT, DESYNPUF: Claim Line Segment
+Inpatient Claims, 4, CLM_FROM_DT, DESYNPUF: Claims start date
+Inpatient Claims, 5, CLM_THRU_DT, DESYNPUF: Claims end date
+Inpatient Claims, 6, PRVDR_NUM, DESYNPUF: Provider Institution
+Inpatient Claims, 7, CLM_PMT_AMT, DESYNPUF: Claim Payment Amount
+Inpatient Claims, 8, NCH_PRMRY_PYR_CLM_PD_AMT, DESYNPUF: NCH Primary Payer Claim Paid Amount
+Inpatient Claims, 9, AT_PHYSN_NPI, DESYNPUF: Attending Physician - National Provider Identifier Number
+Inpatient Claims, 10, OP_PHYSN_NPI, DESYNPUF: Operating Physician - National Provider Identifier Number
+Inpatient Claims, 11, OT_PHYSN_NPI, DESYNPUF: Other Physician - National Provider Identifier Number
+Inpatient Claims, 12, CLM_ADMSN_DT, DESYNPUF: Inpatient admission date
+Inpatient Claims, 13, ADMTNG_ICD9_DGNS_CD, DESYNPUF: Claim Admitting Diagnosis Code
+Inpatient Claims, 14, CLM_PASS_THRU_PER_DIEM_AMT, DESYNPUF: Claim Pass Thru Per Diem Amount
+Inpatient Claims, 15, NCH_BENE_IP_DDCTBL_AMT, DESYNPUF: NCH Beneficiary Inpatient Deductible Amount
+Inpatient Claims, 16, NCH_BENE_PTA_COINSRNC_LBLTY_AM, DESYNPUF: NCH Beneficiary Part A Coinsurance Liability Amount
+Inpatient Claims, 17, NCH_BENE_BLOOD_DDCTBL_LBLTY_AM, DESYNPUF: NCH Beneficiary Blood Deductible Liability Amount
+Inpatient Claims, 18, CLM_UTLZTN_DAY_CNT, DESYNPUF: Claim Utilization Day Count
+Inpatient Claims, 19, NCH_BENE_DSCHRG_DT, DESYNPUF: Inpatient discharged date
+Inpatient Claims, 20, CLM_DRG_CD, DESYNPUF: Claim Diagnosis Related Group Code
+Inpatient Claims, 21-30, ICD9_DGNS_CD_1 – ICD9_DGNS_CD_10, DESYNPUF: Claim Diagnosis Code 1 - Claim Diagnosis Code 10
+Inpatient Claims, 31-36, ICD9_PRCDR_CD_1 – ICD9_PRCDR_CD_6, DESYNPUF: Claim Procedure Code 1 - Claim Procedure Code 6
+Inpatient Claims, 37-81, HCPCS_CD_1 – HCPCS_CD_45, DESYNPUF: Revenue Center HCFA Common Procedure Coding System 1 - Revenue Center HCFA Common Procedure Coding System 45
+Outpatient Claims, 1, DESYNPUF_ID, DESYNPUF: Beneficiary Code
+Outpatient Claims, 2, CLM_ID, DESYNPUF: Claim ID
+Outpatient Claims, 3, SEGMENT, DESYNPUF: Claim Line Segment
+Outpatient Claims, 4, CLM_FROM_DT, DESYNPUF: Claims start date
+Outpatient Claims, 5, CLM_THRU_DT, DESYNPUF: Claims end date
+Outpatient Claims, 6, PRVDR_NUM, DESYNPUF: Provider Institution
+Outpatient Claims, 7, CLM_PMT_AMT, DESYNPUF: Claim Payment Amount
+Outpatient Claims, 8, NCH_PRMRY_PYR_CLM_PD_AMT, DESYNPUF: NCH Primary Payer Claim Paid Amount
+Outpatient Claims, 9, AT_PHYSN_NPI, DESYNPUF: Attending Physician - National Provider Identifier Number
+Outpatient Claims, 10, OP_PHYSN_NPI, DESYNPUF: Operating Physician - National Provider Identifier Number
+Outpatient Claims, 11, OT_PHYSN_NPI, DESYNPUF: Other Physician - National Provider Identifier Number
+Outpatient Claims, 12, NCH_BENE_BLOOD_DDCTBL_LBLTY_AM, DESYNPUF: NCH Beneficiary Blood Deductible Liability Amount
+Outpatient Claims, 13-22, ICD9_DGNS_CD_1 – ICD9_DGNS_CD_10, DESYNPUF: Claim Diagnosis Code 1 - Claim Diagnosis Code 10
+Outpatient Claims, 23-28, ICD9_PRCDR_CD_1 – ICD9_PRCDR_CD_6, DESYNPUF: Claim Procedure Code 1 - Claim Procedure Code 6
+Outpatient Claims, 29, NCH_BENE_PTB_DDCTBL_AMT, DESYNPUF: NCH Beneficiary Part B Deductible Amount
+Outpatient Claims, 30, NCH_BENE_PTB_COINSRNC_AMT, DESYNPUF: NCH Beneficiary Part B Coinsurance Amount
+Outpatient Claims, 31, ADMTNG_ICD9_DGNS_CD, DESYNPUF: Claim Admitting Diagnosis Code
+Outpatient Claims, 32-76, HCPCS_CD_1 – HCPCS_CD_45, DESYNPUF: Revenue Center HCFA Common Procedure Coding System 1 - Revenue Center HCFA Common Procedure Coding System 45
+Carrier Claims, 1, DESYNPUF_ID, DESYNPUF: Beneficiary Code
+Carrier Claims, 2, CLM_ID, DESYNPUF: Claim ID
+Carrier Claims, 3, CLM_FROM_DT, DESYNPUF: Claims start date
+Carrier Claims, 4, CLM_THRU_DT, DESYNPUF: Claims end date
+Carrier Claims, 5-12, ICD9_DGNS_CD_1 – ICD9_DGNS_CD_8, DESYNPUF: Claim Diagnosis Code 1 - Claim Diagnosis Code 8
+Carrier Claims, 13-25, PRF_PHYSN_NPI_1 - PRF_PHYSN_NPI_13, DESYNPUF: Provider Physician - National Provider Identifier Number
+Carrier Claims, 26-38, TAX_NUM_1 – TAX_NUM_13, DESYNPUF: Provider Institution Tax Number
+Carrier Claims, 39-51, HCPCS_CD_1 – HCPCS_CD_13, DESYNPUF: Line HCFA Common Procedure Coding System 1 - Line HCFA Common Procedure Coding System 13
+Carrier Claims, 52-64, LINE_NCH_PMT_AMT_1 - LINE_NCH_PMT_AMT_13, DESYNPUF: Line NCH Payment Amount 1 - Line NCH Payment Amount 13
+Carrier Claims, 65-77, LINE_BENE_PTB_DDCTBL_AMT_1 – LINE_BENE_PTB_DDCTBL_AMT_13, DESYNPUF: Line Beneficiary Part B Deductible Amount 1 - Line Beneficiary Part B Deductible Amount 13
+Carrier Claims, 78-90, LINE_BENE_PRMRY_PYR_PD_AMT_1 - LINE_BENE_PRMRY_PYR_PD_AMT_13, DESYNPUF: Line Beneficiary Primary Payer Paid Amount 1 - Line Beneficiary Primary Payer Paid Amount 13
+Carrier Claims, 91-103, LINE_COINSRNC_AMT_1 – LINE_COINSRNC_AMT_13, DESYNPUF: Line Coinsurance Amount 1 - Line Coinsurance Amount 13
+Carrier Claims, 104-116, LINE_ALOWD_CHRG_AMT_1 - LINE_ALOWD_CHRG_AMT_13, DESYNPUF: Line Allowed Charge Amount 1 - Line Allowed Charge Amount 13
+Carrier Claims, 117-129, LINE_PRCSG_IND_CD_1 - LINE_PRCSG_IND_CD_13, DESYNPUF: Line Processing Indicator Code 1 - Line Processing Indicator Code 13
+Carrier Claims, 130-142, LINE_ICD9_DGNS_CD_1 – LINE_ICD9_DGNS_CD_13, DESYNPUF: Line Diagnosis Code 1 - Line Diagnosis Code 13
+Prescription Drug Events, 1, DESYNPUF_ID, DESYNPUF: Beneficiary Code
+Prescription Drug Events, 2, PDE_ID, DESYNPUF: CCW Part D Event Number
+Prescription Drug Events, 3, SRVC_DT, DESYNPUF: RX Service Date
+Prescription Drug Events, 4, PROD_SRVC_ID, DESYNPUF: Product Service ID
+Prescription Drug Events, 5, QTY_DSPNSD_NUM, DESYNPUF: Quantity Dispensed
+Prescription Drug Events, 6, DAYS_SUPLY_NUM, DESYNPUF: Days Supply
+Prescription Drug Events, 7, PTNT_PAY_AMT, DESYNPUF: Patient Pay Amount
+Prescription Drug Events, 8, TOT_RX_CST_AMT, DESYNPUF: Gross Drug Cost
