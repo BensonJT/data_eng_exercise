@@ -172,6 +172,9 @@ This will:
 For development or troubleshooting, you can run stages separately:
 
 ```bash
+# For the entire pipeline
+python main.py --all
+
 # Initialize database only
  python main.py --init-db  
 
@@ -179,8 +182,10 @@ For development or troubleshooting, you can run stages separately:
 python main.py --ingest
 
 # Validate ingestion (AFTER --ingest, BEFORE transformation)
-# This is optional but recommended to ensure data integrity
 python main.py --validate
+
+# Transform data
+python main.py --transform
 
 # Run comparison only (requires data to be ingested and transformed)
 python main.py --compare
@@ -200,9 +205,9 @@ python main.py --report
 
 2. **Validate** (recommended before proceeding):
    ```bash
-   python main.py --validate
+   python main.py --validate --transform
    ```
-   - If validation passes, proceed to comparison
+   - If validation passes, proceed to transform
    - If validation fails, check `.env` paths and re-run `--ingest`
 
 3. **Compare and Report**:
