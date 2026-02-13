@@ -203,7 +203,7 @@ python main.py --report
    python main.py --init-db --ingest
    ```
 
-2. **Validate** (recommended before proceeding):
+2. **Validate and Transform**:
    ```bash
    python main.py --validate --transform
    ```
