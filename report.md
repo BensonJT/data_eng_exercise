@@ -8,12 +8,12 @@ This report evaluates the quality of the healthcare claims data migration from t
 
 | Metric | Value | Status |
 |--------|-------|--------|
-| Carrier Claims Quality | 5.04σ (192 DPMO, 99.98% yield) | ✅ Excellent |
+| Carrier Claims Quality | 4.58σ (1,095 DPMO, 99.89% yield) | ☑️ Good |
 | Beneficiary Summary Quality | 4.68σ (768 DPMO, 99.92% yield) | ☑️ Good |
 | Missing Beneficiaries | 159 | ❌ Critical |
 | Beneficiary Records with Defects | 820 | ⚠️ Review |
 | Missing Claims | 4,777 | ❌ Critical |
-| Claim Records with Defects | 20,078 | ❌ Critical |
+| Claim Records with Defects | 25,320 | ❌ Critical |
 | Payment Discrepancies | 82,699 | ❌ Critical |
 
 ---
@@ -31,7 +31,7 @@ This report evaluates the quality of the healthcare claims data migration from t
 
 | Dataset | Total Units | Total Defects | Sigma Level | DPMO | Yield % |
 |---------|-------------|---------------|-------------|------|----------|
-| Carrier Claims | 4,746,577 | 93,338 | 5.04σ | 192 | 99.98% |
+| Carrier Claims | 4,746,577 | 530,376 | 4.58σ | 1,095 | 99.89% |
 | Beneficiary Summary | 343,803 | 8,193 | 4.68σ | 768 | 99.92% |
 
 📊 **Detailed Analysis**: 
@@ -70,11 +70,11 @@ This report evaluates the quality of the healthcare claims data migration from t
 
 | Field Family | Total Defects | DPMO | Sigma Level |
 |--------------|---------------|------|-------------|
-| LINE_NCH_PMT_AMT | 21,668 | 4,570 | 4.12σ |
-| LINE_BENE_PTB_DDCTBL_AMT | 8,408 | 1,773 | 4.43σ |
-| LINE_BENE_PRMRY_PYR_PD_AMT | 8,378 | 1,767 | 4.44σ |
-| LINE_ALOWD_CHRG_AMT | 7,480 | 1,577 | 4.47σ |
-| LINE_PRCSG_IND_CD | 7,351 | 1,550 | 4.48σ |
+| LINE_PRCSG_IND_CD | 75,497 | 15,905 | 3.66σ |
+| LINE_ICD9_DGNS_CD | 75,238 | 15,851 | 3.66σ |
+| TAX_NUM | 75,176 | 15,837 | 3.66σ |
+| PRF_PHYSN_NPI | 75,169 | 15,836 | 3.66σ |
+| HCPCS_CD | 75,106 | 15,823 | 3.66σ |
 
 **Beneficiary Summary - Highest Error Fields:**
 
@@ -156,3 +156,186 @@ This report evaluates the quality of the healthcare claims data migration from t
 | Attribute Mismatches | 178 | [beneficiary_attribute_mismatches.csv](data/beneficiary_attribute_mismatches.csv) |
 | Date Differences (DOB/DOD) | 178 | [beneficiary_date_differences.csv](data/beneficiary_date_differences.csv) |
 | Comprehensive Line Differences | 1,322 | [comprehensive_beneficiary_differences.csv](data/comprehensive_beneficiary_differences.csv) |
+| Beneficiary Audit Sample | 820 | [audit_beneficiary_summary.csv](data/audit_beneficiary_summary.csv) |
+
+### Sample Attribute Mismatches
+
+The following fields were compared: Birth Date, Sex, Race, ESRD Indicator
+
+| DESYNPUF_ID      |   YEAR |   src_BENE_BIRTH_DT |   new_BENE_BIRTH_DT |   src_BENE_SEX_IDENT_CD |   new_BENE_SEX_IDENT_CD |
+|:-----------------|-------:|--------------------:|--------------------:|------------------------:|------------------------:|
+| 283EE6C929EA6E2A |   2010 |            19310601 |            19300903 |                       1 |                       1 |
+| 2B868D4AF1ED6CB9 |   2010 |            19390401 |            19380503 |                       2 |                       2 |
+| 2C606D7AF2DA6CDF |   2010 |            19230301 |            19221105 |                       2 |                       2 |
+| 2D6220567C59C1A7 |   2010 |            19350701 |            19360325 |                       1 |                       1 |
+| 30C7F0B30079FAFC |   2010 |            19480801 |            19471219 |                       1 |                       1 |
+
+_Showing 5 of 178 total mismatches. See CSV for complete list._
+
+### Detailed CSV Exports - Beneficiary Analysis
+
+**1. [missing_beneficiaries.csv](data/missing_beneficiaries.csv)** (159 records)
+
+- **Columns**: DESYNPUF_ID, BENE_DEATH_YEAR, YEAR, FINDING
+- **What it shows**: Beneficiaries present in source system but missing in new system
+- **Key filter**: Only includes beneficiaries who either (a) had no death date, or (b) death year is after the record year (should still be active)
+- **Action required**: Investigate ETL process - these records may indicate data loss during migration
+- **Business impact**: Missing beneficiaries = missing claims = potential revenue loss
+
+**2. [extra_beneficiaries.csv](data/extra_beneficiaries.csv)** (0 records)
+
+- **Columns**: DESYNPUF_ID, BENE_DEATH_YEAR, YEAR, FINDING
+- **What it shows**: Beneficiaries present in new system but NOT in source system
+- **Possible causes**: Duplicate creation, test data leakage, or incorrect source extraction
+- **Action required**: Review and potentially purge if these are erroneous records
+
+**3. [beneficiary_attribute_mismatches.csv](data/beneficiary_attribute_mismatches.csv)** (178 records)
+
+- **Columns**: DESYNPUF_ID, YEAR, src_BENE_BIRTH_DT, new_BENE_BIRTH_DT, src_BENE_SEX_IDENT_CD, new_BENE_SEX_IDENT_CD, src_BENE_RACE_CD, new_BENE_RACE_CD, src_ERSD_IND, new_ERSD_IND, FINDING
+- **What it shows**: Beneficiaries where core demographic attributes changed between systems
+- **Why this matters**: Demographics should be immutable - changes indicate transformation errors
+- **Action required**: 
+  - Birth date changes: Review date parsing logic (format conversions, timezone issues)
+  - Sex/Race changes: Check lookup table mappings and code standardization
+  - ESRD flag changes: Verify chronic condition derivation logic
+
+**4. [beneficiary_date_differences.csv](data/beneficiary_date_differences.csv)** (178 records)
+
+- **Columns**: DESYNPUF_ID, src_dob, new_dob, src_dod, new_dod
+- **What it shows**: Focused view of birth and death date discrepancies
+- **Common patterns to look for**:
+  - Date or attribute changes (not matched)
+  - Date format issues (YYYYMMDD vs YYYY-MM-DD)
+  - Day/month transposition (01/06 vs 06/01)
+  - Year arithmetic errors (+/- 1 year patterns)
+- **Action required**: Sample records, identify systematic vs random errors, fix transformation logic
+
+**5. [comprehensive_beneficiary_differences.csv](data/comprehensive_beneficiary_differences.csv)** (1,322 records)
+
+- **Columns**: All 33 beneficiary summary fields (DESYNPUF_ID, YEAR, demographics, coverage, conditions, financials)
+- **What it shows**: ANY row where ANY field differs between source and new (SQL EXCEPT operation)
+- **Size**: Largest beneficiary CSV - this is your master list of all differences
+- **How to use**:
+  - Import into Excel/SQL and pivot by specific columns to find patterns
+  - Compare financial fields (MEDREIMB_*, BENRES_*, PPPYMT_*) to quantify dollar impact per beneficiary
+  - Cross-reference DESYNPUF_IDs with the other CSVs to understand root causes
+  - Use for detailed reconciliation and auditing
+
+**6. [audit_beneficiary_summary.csv](data/audit_beneficiary_summary.csv)** (820 records)
+
+- **Columns**: All 33 claim summary fields (DESYNPUF_ID, YEAR, demographics, coverage, conditions, financials)
+- **What it shows**: ANY row where ANY field differs between source and new (SQL EXCEPT operation)
+- **Size**: Largest claim CSV - this is your master list of all differences (0 equals match, 1 equals no match)
+- **How to use**:
+  - Import into Excel/SQL and pivot by specific columns to find patterns
+  - Compare financial fields (MEDREIMB_*, BENRES_*, PPPYMT_*) to quantify volume of defects for each field
+  - Cross-reference DESYNPUF_IDs with the other CSVs to understand root causes
+  - Use for detailed reconciliation, auditing, and six sigma calculations
+
+---
+
+## 4. Carrier Claims Data Quality
+
+### Summary of Claims Discrepancies
+
+| Discrepancy Type | Count | CSV Export |
+|------------------|-------|------------|
+| Missing Claims | 4,777 | [missing_claims.csv](data/missing_claims.csv) |
+| Payment Amount Discrepancies | 82,699 | [claim_payment_amount_discrepancies.csv](data/claim_payment_amount_discrepancies.csv) |
+| Orphan Claims (4-way match) | 5,242 | [comprehensive_orphan_claims.csv](data/comprehensive_orphan_claims.csv) |
+| Claim Audit Sample | 25,320 | [claim_records_with_discrepancies_sample.csv](data/audit_claim_summary.csv) |
+
+### Sample Payment Discrepancies
+
+|          CLM_ID |   CLM_FROM_DT |   src_pmt |   new_pmt |   variance |
+|----------------:|--------------:|----------:|----------:|-----------:|
+| 887183387821152 |      20101109 |        30 |        27 |          3 |
+| 887473386966448 |      20080531 |         0 |         5 |         -5 |
+| 887883389139678 |      20100629 |         0 |         5 |         -5 |
+| 887913386549027 |      20090407 |        60 |        54 |          6 |
+| 887723388459696 |      20080324 |        20 |        18 |          2 |
+
+_Showing 5 of 82,699 total payment discrepancies. See CSV for complete list._
+
+### Detailed CSV Exports - Claims Analysis
+
+**1. [missing_claims.csv](data/missing_claims.csv)** (4,777 records)
+
+- **Columns**: CLM_ID, FINDING
+- **What it shows**: Claims present in source OR new system (UNION of both directions)
+- **FINDING values**:
+  - 'Error: Claim Missing in New File' = Claims lost during migration
+  - 'Error: Claim Present in New File, Not in Original File' = Claims created erroneously
+- **Business impact**: Missing claims = unbilled services = revenue loss
+- **Action required**: Group by CLM_FROM_DT (claim date) to identify if losses are concentrated in specific time periods
+
+**2. [claim_payment_amount_discrepancies.csv](data/claim_payment_amount_discrepancies.csv)** (82,699 records, 5.2 MB)
+
+- **Columns**: CLM_ID, record_status, STATE_NAME, CLM_FROM_DT, src_pmt, new_pmt, processing_ind, allowed_amt, business_rule_status, variance
+- **What it shows**: Claims where LINE_NCH_PMT_AMT_1 (NCH payment amount line 1) differs between systems
+- **Critical field: business_rule_status**:
+  - 'Valid' = Payment should match based on business rules (allowed_amt, processing_ind)
+  - 'Invalid' = Payment difference may be expected due to processing rules
+- **How to use**:
+  - Filter WHERE business_rule_status = 'Valid' AND variance > threshold (e.g., $10)
+  - Group by STATE_NAME to identify geographic patterns
+  - Sort by ABS(variance) descending to prioritize high-dollar errors
+  - Calculate total financial exposure: SUM(ABS(variance))
+- **Contains**: Full claim-level detail for payment reconciliation and adjustment processing
+
+**3. [comprehensive_orphan_claims.csv](data/comprehensive_orphan_claims.csv)** (5,242 records, 3.9 MB)
+
+- **Columns**: All 142 carrier claim fields (DESYNPUF_ID, CLM_ID, CLM_FROM_DT, CLM_THRU_DT, diagnosis codes, procedures, NPIs, financials, etc.)
+- **What it shows**: Claims in new system that don't match on 4-way key (DESYNPUF_ID, CLM_ID, CLM_FROM_DT, CLM_THRU_DT)
+- **Why this matters**: Matching on CLM_ID alone found fewer orphans - using 4-way match finds date mismatches
+- **Possible causes**:
+  - Date transformation errors (CLM_FROM_DT or CLM_THRU_DT changed)
+  - Beneficiary ID transformation errors (DESYNPUF_ID changed)
+  - Claim ID transformation errors (CLM_ID changed)
+  - Combination of above = claim exists but with wrong metadata
+- **How to investigate**:
+  - Check if CLM_ID exists in source with different dates
+  - Check if DESYNPUF_ID mapping is correct
+  - Look for CLM_FROM_DT = '20231332' (invalid dates that should be '20080304')
+  - These claims may need manual reconciliation or reprocessing
+
+**4. [audit_claim_summary.csv](data/audit_claim_summary.csv)** (25,320 records)
+
+- **Columns**: All 142 carrier claim fields (DESYNPUF_ID, CLM_ID, CLM_FROM_DT, CLM_THRU_DT, diagnosis codes, procedures, NPIs, financials, etc.)
+- **What it shows**: ANY row where ANY field differs between source and new (SQL EXCEPT operation)
+- **Size**: Largest claim CSV - this is your master list of all claim-level differences (0 equals match, 1 equals no match)
+- **How to use**:
+  - Import into Excel/SQL and pivot by specific columns to find patterns
+  - Compare financial fields (MEDREIMB_*, BENRES_*, PPPYMT_*) to quantify volume of defects for each field
+  - Cross-reference DESYNPUF_IDs with the other CSVs to understand root causes
+  - Use for detailed reconciliation, auditing, and six sigma calculations
+
+---
+
+## 5. Recommendations
+
+1. **FOCUS AREA**: LINE_PRCSG_IND_CD has 75,497 defects. Prioritize data cleansing and transformation logic review for this field.
+
+2. **FINANCIAL PRIORITY**: LINE_NCH_PMT_AMT accounts for 36.5% of total financial variance ($158,480.91). Address this field first for maximum impact.
+
+3. **DATA LOSS**: 159 beneficiaries missing in new system. Verify ETL completeness and investigate potential data loss.
+
+4. **DATA LOSS**: 4,777 claims missing in new system. Review ingestion logs and verify source-to-target mapping.
+
+5. **DATA DISCREPANCIES**: 25,320 claims data discrepancies in new system. Review ingestion logs and verify source-to-target mapping at the field level.
+
+---
+
+## Conclusion
+
+The migration demonstrates **good overall quality** with an average sigma level of 4.63σ. Remedial action required.
+
+**Next Steps:**
+1. Review detailed CSV exports for complete defect lists
+2. Prioritize remediation based on Six Sigma and Financial Impact analysis
+3. Re-run comparison after implementing fixes
+4. Target minimum 4σ quality before production deployment
+
+---
+
+_Report generated by Data Migration Quality Assessment Pipeline_
