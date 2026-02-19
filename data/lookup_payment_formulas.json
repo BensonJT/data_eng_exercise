@@ -1,0 +1,56 @@
+﻿[
+  {
+    "Variable names": "MEDREIMB_IP",
+    "Labels": "Inpatient annual Medicare reimbursement amount",
+    "Sum of": "CLM_PMT_AMT + CLM_UTLZTN_DAY_CNT * CLM_PASS_THRU_PER_DIEM_AMT",
+    "Type": "NUM"
+  },
+  {
+    "Variable names": "BENRES_IP",
+    "Labels": "Inpatient annual beneficiary responsibility amount",
+    "Sum of": "NCH_BENE_IP_DDCTBL_AMT + NCH_BENE_PTA_COINSRNC_LBLTY_AM + NCH_BENE_BLOOD_DDCTBL_LBLTY_AM",
+    "Type": "NUM"
+  },
+  {
+    "Variable names": "PPPYMT_IP",
+    "Labels": "Inpatient annual primary payer reimbursement amount",
+    "Sum of": "NCH_PRMRY_PYR_CLM_PD_AMT",
+    "Type": "NUM"
+  },
+  {
+    "Variable names": "MEDREIMB_OP",
+    "Labels": "Outpatient Institutional annual Medicare reimbursement amount",
+    "Sum of": "CLM_PMT_AMT",
+    "Type": "NUM"
+  },
+  {
+    "Variable names": "BENRES_OP",
+    "Labels": "Outpatient Institutional annual beneficiary responsibility amount",
+    "Sum of": "NCH_BENE_BLOOD_DDCTBL_LBLTY_AM + NCH_BENE_PTB_DDCTBL_AMT + NCH_BENE_PTB_COINSRNC_AMT",
+    "Type": "NUM"
+  },
+  {
+    "Variable names": "PPPYMT_OP",
+    "Labels": "Outpatient Institutional annual primary payer reimbursement amount",
+    "Sum of": "NCH_PRMRY_PYR_CLM_PD_AMT",
+    "Type": "NUM"
+  },
+  {
+    "Variable names": "MEDREIMB_CAR",
+    "Labels": "Carrier annual Medicare reimbursement amount",
+    "Sum of": "LINE_NCH_PMT_AMT IF LINE_PRCSG_IND_CD = 'A' OR (LINE_PRCSG_IND_CD IN ('R','S') & LINE_ALOWD_CHRG_AMT > 0)",
+    "Type": "NUM"
+  },
+  {
+    "Variable names": "BENRES_CAR",
+    "Labels": "Carrier annual beneficiary responsibility amount",
+    "Sum of": "LINE_BENE_PTB_DDCTBL_AMT + LINE_COINSRNC_AMT IF LINE_PRCSG_IND_CD = 'A' OR (LINE_PRCSG_IND_CD IN ('R','S') & LINE_ALOWD_CHRG_AMT > 0)",
+    "Type": "NUM"
+  },
+  {
+    "Variable names": "PPPYMT_CAR",
+    "Labels": "Carrier annual primary payer reimbursement amount",
+    "Sum of": "LINE_BENE_PRMRY_PYR_PD_AMT IF LINE_PRCSG_IND_CD = 'A' OR (LINE_PRCSG_IND_CD IN ('R','S') & LINE_ALOWD_CHRG_AMT > 0)",
+    "Type": "NUM"
+  }
+]
