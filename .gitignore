@@ -3,3 +3,4 @@ __pycache__/
 .env
 .ipynb_checkpoints/
 notebooks/.ipynb_checkpoints
+*:Zone.Identifier
