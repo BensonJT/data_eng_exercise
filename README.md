@@ -45,6 +45,7 @@ The pipeline consists of four main stages executed in sequence:
 - **ORM**: SQLAlchemy 2.0 with DuckDB driver
 - **Data Processing**: pandas with chunked reading for memory efficiency
 - **Statistical Analysis**: scipy for accurate Six Sigma calculations (inverse normal distribution)
+- **Visualization**: Streamlit + Plotly (interactive dashboard — see [Interactive Dashboard](#interactive-dashboard))
 - **Configuration**: python-dotenv for environment variable management
 - **Python**: 3.10+
 
@@ -332,6 +333,42 @@ Detailed analysis report including:
 - Includes styling and formatting for better readability
 - Can be shared with stakeholders via email or web hosting
 
+## Interactive Dashboard
+
+After the pipeline has been run at least once, the results can be explored interactively through a Streamlit dashboard without re-running the pipeline.
+
+`dashboard.py` connects directly to the DuckDB database in read-only mode and queries the analytical views created during the transform phase — the same views that produced the CSV output files. No pipeline re-run is required.
+
+### Dashboard Features
+
+| Tab | What It Shows | DuckDB View |
+|---|---|---|
+| Migration Scorecard | Overall sigma level, DPMO, and process yield for Carrier Claims and Beneficiary Summary | `vw_sigma_analysis` |
+| Six Sigma by Field | Interactive bar chart of sigma level by field family; adjustable top-N slider | `vw_sigma_analysis_carrier_columns` / `vw_sigma_analysis_beneficiary_columns` |
+| Financial Impact | Pareto chart of financial variance by field with cumulative % overlay and 80% threshold line | `vw_claim_financial_error_impact` / `vw_beneficiary_financial_error_impact` |
+| Discrepancy Drill-Down | Filterable record-level view of missing beneficiaries, missing claims, attribute mismatches, and payment discrepancies | `vw_beneficiary_errors`, `vw_claim_mismatches`, `vw_beneficiary_attribute_errors`, `vw_claim_line_nch_pmt_amt_1_differences` |
+
+Sigma levels displayed in the dashboard are recalculated using the same scipy inverse normal formula used by the pipeline, ensuring exact consistency with the CSV output files.
+
+### Running the Dashboard
+
+The fastest way to launch is the included shell script — it activates the conda environment and starts Streamlit in one step:
+
+```bash
+./run_dashboard.sh
+```
+
+Or manually:
+
+```bash
+conda activate data_eng
+streamlit run dashboard.py
+```
+
+The dashboard opens automatically in your default browser at `http://localhost:8501`. The `DUCKDB_PATH` in your `.env` file is used to locate the database — no additional configuration required.
+
+> **Note**: The pipeline must have been run through at least the `--transform` stage before launching the dashboard. The dashboard queries views that are created during transformation.
+
 ## Project Structure
 
 ```
@@ -339,6 +376,7 @@ data_eng/
 ├── .env                      # Your local configuration (not in git)
 ├── .env.example              # Template for configuration
 ├── main.py                   # Pipeline entry point
+├── dashboard.py              # Streamlit interactive dashboard (read-only, no re-run needed)
 ├── convert_report_to_html.py # Convert Markdown report to HTML
 ├── requirements.txt          # Python dependencies
 ├── README.md                 # This file
