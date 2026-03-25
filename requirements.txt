@@ -8,3 +8,5 @@ scipy
 numpy
 duckdb
 duckdb-engine
+streamlit
+plotly
