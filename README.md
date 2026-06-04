@@ -166,7 +166,7 @@ This will:
 6. Execute comparison logic
 7. Generate both Markdown and HTML reports
 
-**Expected Runtime**: 4 -  hours depending on system performance for initial run (-- all)
+**Expected Runtime**: 4-6 hours depending on system performance for initial run (`--all`)
 
 ### Run Individual Stages
 
@@ -339,6 +339,39 @@ After the pipeline has been run at least once, the results can be explored inter
 
 `dashboard.py` connects directly to the DuckDB database in read-only mode and queries the analytical views created during the transform phase — the same views that produced the CSV output files. No pipeline re-run is required.
 
+### Dashboard Preview
+
+**Migration Scorecard** — overall sigma level, DPMO, and process yield for each dataset:
+
+![Migration Scorecard](screenshots/01-migration-scorecard.png)
+
+**Six Sigma by Field** — sigma level by field family with an adjustable top-N slider:
+
+![Six Sigma by Field](screenshots/02-six-sigma-by-field.png)
+
+**Financial Impact** — Pareto analysis of dollar variance with cumulative % overlay and 80% threshold line:
+
+![Financial Impact Pareto](screenshots/03-financial-impact.png)
+
+**Go / No-Go Executive Summary** — traffic-light migration readiness assessment:
+
+![Go / No-Go Summary](screenshots/09-go-no-go-summary.png)
+
+<details>
+<summary><strong>More tabs</strong> — discrepancy drill-down, row-count validation, defect heatmap, chronic-condition errors, and year-over-year trend</summary>
+
+![Discrepancy Drill-Down](screenshots/04-discrepancy-drilldown.png)
+
+![Row Count Validation](screenshots/05-row-count-validation.png)
+
+![Defect Heatmap](screenshots/06-defect-heatmap.png)
+
+![Chronic Condition Errors](screenshots/07-chronic-condition-errors.png)
+
+![Year-over-Year Trend](screenshots/08-year-over-year-trend.png)
+
+</details>
+
 ### Dashboard Features
 
 | Tab | What It Shows | DuckDB View |
@@ -380,7 +413,6 @@ data_eng/
 ├── convert_report_to_html.py # Convert Markdown report to HTML
 ├── requirements.txt          # Python dependencies
 ├── README.md                 # This file
-├── FEEDBACK.md               # Assignment feedback
 │
 ├── src/                      # Main application code
 │   ├── db.py                 # Database connection and utilities
@@ -449,6 +481,14 @@ data_eng/
 - **Transformation**: Creates 50+ analytical views and audit tables
 - **Comparison**: Executes complex (advanced) SQL joins and aggregations
 - **Expected Total Runtime**: 4 - 6 hours on average personal computers (depends on system performance)
+
+## Development Approach
+
+> **Jeffrey designed the queries and set the approach; AI assisted with syntax/setup.**
+
+This project was built with the assistance of agentic AI development tools (e.g., Claude Code) used as a pair-programming accelerator. AI assistance was applied to scaffolding, boilerplate, and documentation drafting, while the core engineering decisions remained hands-on: the data model and schema design, the SQL comparison and Six Sigma logic, the validation strategy, and the interpretation of results. Every generated component was reviewed, tested against the CMS datasets, and validated for correctness before inclusion.
+
+I treat agentic AI as a force multiplier for delivery speed and consistency — the same way a modern BI team uses it — while retaining full ownership of architecture, data quality, and analytical conclusions.
 
 ## Additional Resources
 
