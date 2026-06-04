@@ -376,10 +376,15 @@ After the pipeline has been run at least once, the results can be explored inter
 
 | Tab | What It Shows | DuckDB View |
 |---|---|---|
-| Migration Scorecard | Overall sigma level, DPMO, and process yield for Carrier Claims and Beneficiary Summary | `vw_sigma_analysis` |
-| Six Sigma by Field | Interactive bar chart of sigma level by field family; adjustable top-N slider | `vw_sigma_analysis_carrier_columns` / `vw_sigma_analysis_beneficiary_columns` |
-| Financial Impact | Pareto chart of financial variance by field with cumulative % overlay and 80% threshold line | `vw_claim_financial_error_impact` / `vw_beneficiary_financial_error_impact` |
-| Discrepancy Drill-Down | Filterable record-level view of missing beneficiaries, missing claims, attribute mismatches, and payment discrepancies | `vw_beneficiary_errors`, `vw_claim_mismatches`, `vw_beneficiary_attribute_errors`, `vw_claim_line_nch_pmt_amt_1_differences` |
+| 🎯 Migration Scorecard | Overall sigma level, DPMO, and process yield for Carrier Claims and Beneficiary Summary | `vw_sigma_analysis` |
+| 📉 Six Sigma by Field | Interactive bar chart of sigma level by field family; adjustable top-N slider | `vw_sigma_analysis_carrier_columns` / `vw_sigma_analysis_beneficiary_columns` |
+| 💵 Financial Impact | Pareto chart of financial variance by field with cumulative % overlay and 80% threshold line | `vw_claim_financial_error_impact` / `vw_beneficiary_financial_error_impact` |
+| 🔍 Discrepancy Drill-Down | Filterable record-level view of missing beneficiaries, missing claims, attribute mismatches, and payment discrepancies | `vw_beneficiary_errors`, `vw_claim_mismatches`, `vw_beneficiary_attribute_errors`, `vw_claim_line_nch_pmt_amt_1_differences` |
+| 📦 Row Count Validation | Source-vs-new-system record counts per dataset, with deltas to confirm no rows were dropped or duplicated in migration | `vw_source_counts` |
+| 🔥 Defect Heatmap | Per-field error counts across the Beneficiary Summary, rendered as a heatmap to surface the highest-defect attributes at a glance | `audit_beneficiary_summary` |
+| 🏥 Chronic Condition Errors | Migration error rates for each chronic-condition flag (e.g., diabetes, CHF, cancer), isolating clinical fields most affected | `audit_beneficiary_summary` |
+| 📅 Year-over-Year Trend | Migration error trend across benefit years to reveal whether quality issues concentrate in specific source periods | `audit_beneficiary_summary` |
+| 🚦 Go / No-Go Summary | Traffic-light executive readiness assessment aggregating field-level sigma into a single migration go/no-go verdict | `vw_sigma_analysis_carrier_columns` / `vw_sigma_analysis_beneficiary_columns` |
 
 Sigma levels displayed in the dashboard are recalculated using the same scipy inverse normal formula used by the pipeline, ensuring exact consistency with the CSV output files.
 
