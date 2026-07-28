@@ -1,4 +1,31 @@
-# Data Engineer Take-Home Assessment
+# Healthcare Claims Migration: Data Quality Assessment Pipeline
+
+A Python / SQL / DuckDB pipeline that scores the quality of a large healthcare claims migration, quantifies its financial impact, and produces field-level defect detail for every record rather than a sampled estimate.
+
+Built on CMS DE-SynPUF synthetic public use files, so the whole thing is reproducible end to end.
+
+## What it found
+
+The headline is that the migration was **good**: 4.63σ average, roughly 99.9% yield. That reads as success right up until you look at where the missing tenth of a percent actually sits.
+
+| Measure | Result |
+|---|---|
+| Carrier claims quality | **4.58σ** — 1,095 DPMO, 99.89% yield |
+| Beneficiary summary quality | **4.68σ** — 768 DPMO, 99.92% yield |
+| Missing beneficiaries | **159** — data loss |
+| Missing claims | **4,777** — data loss |
+| Claim records with defects | **25,320** |
+| Payment discrepancies | **82,699** |
+
+Three things the sigma score alone would not tell you:
+
+- **Data loss ran in both directions.** 159 beneficiaries and 4,777 claims absent from the new system. A yield percentage averages that away; a record-level comparison does not.
+- **Defects concentrate rather than spread.** One field, `LINE_PRCSG_IND_CD`, accounts for 75,497 defects on its own — a transformation-logic problem, not a transfer problem.
+- **So does the money.** `LINE_NCH_PMT_AMT` carries 36.5% of total financial variance ($158,480.91) by itself. That is the good news buried in the bad: a short remediation list with most of the value on it.
+
+![Migration Scorecard](screenshots/01-migration-scorecard.png)
+
+Full analysis, method and per-field detail: **[`report.md`](report.md)** · rendered [`report.html`](report.html) · executive deck [`Data Migration Analysis.pdf`](Data%20Migration%20Analysis.pdf)
 
 ## Overview
 
