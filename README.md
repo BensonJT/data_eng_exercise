@@ -6,26 +6,29 @@ Built on CMS DE-SynPUF synthetic public use files, so the whole thing is reprodu
 
 ## What it found
 
-The headline is that the migration was **good**: 4.63σ average, roughly 99.9% yield. That reads as success right up until you look at where the missing tenth of a percent actually sits.
+**Recommendation: do not proceed with the migration as is.** On the summary scorecard the migration passes: both tables clear the 4.5σ target, roughly 99.9% yield. That reads as success right up until you look at where the missing tenth of a percent actually sits.
 
 | Measure | Result |
 |---|---|
-| Carrier claims quality | **4.58σ** — 1,095 DPMO, 99.89% yield |
-| Beneficiary summary quality | **4.68σ** — 768 DPMO, 99.92% yield |
-| Missing beneficiaries | **159** — data loss |
-| Missing claims | **4,777** — data loss |
-| Claim records with defects | **25,320** |
-| Payment discrepancies | **82,699** |
+| Carrier claims quality | **4.56σ** — 1,095 DPMO, 99.89% yield (passes 4.5σ) |
+| Beneficiary summary quality | **4.67σ** — 769 DPMO, 99.92% yield (passes 4.5σ) |
+| Carrier claim fields below the 4.0σ minimum | **7 of 13** — NO-GO |
+| Claims in the new system but not the source | **4,777** |
+| Beneficiary IDs out of step | **159** missing from the new system, **159** new IDs not in the source |
+| Dates of birth changed | **178** (median shift 194 days) |
+| Payment discrepancies | **82,699** claim lines, about **$470K** of variance |
 
 Three things the sigma score alone would not tell you:
 
-- **Data loss ran in both directions.** 159 beneficiaries and 4,777 claims absent from the new system. A yield percentage averages that away; a record-level comparison does not.
-- **Defects concentrate rather than spread.** One field, `LINE_PRCSG_IND_CD`, accounts for 75,497 defects on its own — a transformation-logic problem, not a transfer problem.
-- **So does the money.** `LINE_NCH_PMT_AMT` carries 36.5% of total financial variance ($158,480.91) by itself. That is the good news buried in the bad: a short remediation list with most of the value on it.
+- **Records moved in both directions.** 4,777 claims appeared that the source never had, and 159 beneficiaries disappeared while 159 new IDs appeared, so the beneficiary row counts match exactly and hide it. A yield percentage averages that away; a record-level comparison does not.
+- **Defects concentrate rather than spread.** Seven claim fields fall below 4.0σ; one, `LINE_PRCSG_IND_CD`, accounts for 75,497 defects on its own: a transformation-logic problem, not a transfer problem.
+- **So does the money.** `LINE_NCH_PMT_AMT` carries 36.5% of the claims financial variance ($158,480.91) by itself. That is the good news buried in the bad: a short remediation list with most of the value on it.
+
+Sigma here matches the dashboard: inverse normal of yield plus the 1.5σ shift. (`vw_sigma_analysis` stores an older approximation, 4.58σ and 4.68σ, which `report.md` still shows.)
 
 ![Migration Scorecard](screenshots/01-migration-scorecard.png)
 
-Full analysis, method and per-field detail: **[`report.md`](report.md)** · rendered [`report.html`](report.html) · executive deck [`Data Migration Analysis.pdf`](Data%20Migration%20Analysis.pdf)
+Full analysis, method and per-field detail: **[`report.md`](report.md)** · rendered [`report.html`](report.html) · executive deck [live](https://bensonjt.github.io/profile/data-migration-presentation.html) · [PDF](https://bensonjt.github.io/profile/Data_Migration_Analysis.pdf), built from the same DuckDB views by [`deck/build_deck.py`](deck/build_deck.py)
 
 ## Overview
 

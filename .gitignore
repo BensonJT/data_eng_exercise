@@ -4,3 +4,6 @@ __pycache__/
 .ipynb_checkpoints/
 notebooks/.ipynb_checkpoints
 *:Zone.Identifier
+# Built deck outputs: the live copy is published to the profile site (deck/build_deck.py --publish)
+deck/data-migration-presentation.html
+deck/Data_Migration_Analysis.pdf
