@@ -24,7 +24,7 @@ Three things the sigma score alone would not tell you:
 - **Defects concentrate rather than spread.** Seven claim fields fall below 4.0σ; one, `LINE_PRCSG_IND_CD`, accounts for 75,497 defects on its own: a transformation-logic problem, not a transfer problem.
 - **So does the money.** `LINE_NCH_PMT_AMT` carries 36.5% of the claims financial variance ($158,480.91) by itself. That is the good news buried in the bad: a short remediation list with most of the value on it.
 
-Sigma here matches the dashboard: inverse normal of yield plus the 1.5σ shift. (`vw_sigma_analysis` stores an older approximation, 4.58σ and 4.68σ, which `report.md` still shows.)
+Sigma here matches the dashboard: inverse normal of yield plus the 1.5σ shift. (`vw_sigma_analysis` also stores an older SQL approximation, 4.58σ and 4.68σ; the dashboard, `report.md` and the deck all use the inverse-normal value.) Regenerate the reports alone with `python main.py --report`.
 
 ![Migration Scorecard](screenshots/01-migration-scorecard.png)
 

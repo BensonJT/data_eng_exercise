@@ -52,7 +52,7 @@ def get_row_counts():
             counts[table] = conn.execute(query).scalar()
     return counts
 
-def calc_six_sigma():
+def calc_six_sigma(export=True):
     """
     Calculate Six Sigma to score Data Migration Quality.
     Recalculates sigma values using accurate scipy inverse normal distribution.
@@ -63,7 +63,7 @@ def calc_six_sigma():
             select * from vw_db_schema order by table_name, column_name
         """)
         schema_df = pd.read_sql(schema_query, conn)
-        schema_df.to_csv(os.path.join(data_dir, "schema.csv"), index=False)
+        if export: schema_df.to_csv(os.path.join(data_dir, "schema.csv"), index=False)
         
         # 1. Overall Six Sigma Analysis
         six_sigma_query = text("""
@@ -75,7 +75,7 @@ def calc_six_sigma():
         if 'YIELD' in six_sigma_df.columns:
             six_sigma_df['SIX_SIGMA'] = six_sigma_df['YIELD'].apply(accurate_sigma_level)
         
-        six_sigma_df.to_csv(os.path.join(data_dir, "six_sigma.csv"), index=False)
+        if export: six_sigma_df.to_csv(os.path.join(data_dir, "six_sigma.csv"), index=False)
         
         # 2. Six Sigma Analysis for Carrier Claim Fields
         six_sigma_carrier_query = text("""
@@ -87,7 +87,7 @@ def calc_six_sigma():
         if 'YIELD' in six_sigma_carrier_df.columns:
             six_sigma_carrier_df['SIX_SIGMA'] = six_sigma_carrier_df['YIELD'].apply(accurate_sigma_level)
         
-        six_sigma_carrier_df.to_csv(os.path.join(data_dir, "six_sigma_carrier.csv"), index=False)
+        if export: six_sigma_carrier_df.to_csv(os.path.join(data_dir, "six_sigma_carrier.csv"), index=False)
 
         # 3. Six Sigma Analysis for Beneficiary Fields
         six_sigma_beneficiary_query = text("""
@@ -99,7 +99,7 @@ def calc_six_sigma():
         if 'YIELD' in six_sigma_beneficiary_df.columns:
             six_sigma_beneficiary_df['SIX_SIGMA'] = six_sigma_beneficiary_df['YIELD'].apply(accurate_sigma_level)
         
-        six_sigma_beneficiary_df.to_csv(os.path.join(data_dir, "six_sigma_beneficiary.csv"), index=False)
+        if export: six_sigma_beneficiary_df.to_csv(os.path.join(data_dir, "six_sigma_beneficiary.csv"), index=False)
         
         # 4. Six Sigma Analysis for All Fields (not grouped)
         six_sigma_columns_query = text("""
@@ -111,7 +111,7 @@ def calc_six_sigma():
         if 'YIELD' in six_sigma_columns_df.columns:
             six_sigma_columns_df['SIX_SIGMA'] = six_sigma_columns_df['YIELD'].apply(accurate_sigma_level)
         
-        six_sigma_columns_df.to_csv(os.path.join(data_dir, "six_sigma_columns.csv"), index=False)
+        if export: six_sigma_columns_df.to_csv(os.path.join(data_dir, "six_sigma_columns.csv"), index=False)
         
     return {
         "six_sigma": six_sigma_df,
@@ -119,7 +119,7 @@ def calc_six_sigma():
         "six_sigma_beneficiary": six_sigma_beneficiary_df
     }
 
-def calc_financial_impact():
+def calc_financial_impact(export=True):
     """
     Calculate Financial Impact of Data Migration Errors
     """
@@ -129,21 +129,21 @@ def calc_financial_impact():
             select * from vw_claim_financial_error_impact
         """)
         financial_impact_claim_df = pd.read_sql(financial_impact_claim_query, conn)
-        financial_impact_claim_df.to_csv(os.path.join(data_dir, "financial_impact_carrier_claim.csv"), index=False)
+        if export: financial_impact_claim_df.to_csv(os.path.join(data_dir, "financial_impact_carrier_claim.csv"), index=False)
         
         # 2. Financial Impact Analysis for Carrier Claim Fields
         financial_impact_beneficiary_query = text("""
             select * from vw_beneficiary_financial_error_impact;
         """)
         financial_impact_beneficiary_df = pd.read_sql(financial_impact_beneficiary_query, conn)
-        financial_impact_beneficiary_df.to_csv(os.path.join(data_dir, "financial_impact_beneficiary.csv"), index=False)
+        if export: financial_impact_beneficiary_df.to_csv(os.path.join(data_dir, "financial_impact_beneficiary.csv"), index=False)
         
     return {
         "financial_impact_claim": financial_impact_claim_df,
         "financial_impact_beneficiary": financial_impact_beneficiary_df
     }
 
-def compare_beneficiaries():
+def compare_beneficiaries(export=True):
     """
     Compares source and new subscriber/beneficiary tables.
     Returns a summary of discrepancies.
@@ -154,35 +154,35 @@ def compare_beneficiaries():
             select * from vw_beneficiary_errors where finding = 'Error: Beneficiary Missing in New File'
         """)
         missing_df_1 = pd.read_sql(missing_query_1, conn)
-        missing_df_1.to_csv(os.path.join(data_dir, "missing_beneficiaries.csv"), index=False)
+        if export: missing_df_1.to_csv(os.path.join(data_dir, "missing_beneficiaries.csv"), index=False)
 
         # 2. Extra beneficiaries in New System (unexpected)
         missing_query_2 = text("""
-            select * from vw_beneficiary_errors where finding = E'rror: Beneficiary Present in New File, Not in Original File'
+            select * from vw_beneficiary_errors where finding = 'Error: Beneficiary Present in New File, Not in Original File'
         """)
         missing_df_2 = pd.read_sql(missing_query_2, conn)
-        missing_df_2.to_csv(os.path.join(data_dir, "extra_beneficiaries.csv"), index=False)
+        if export: missing_df_2.to_csv(os.path.join(data_dir, "extra_beneficiaries.csv"), index=False)
 
         # 3. Identify Beneficiary Attributes that Changed (unexpected)
         mismatch_query = text("""
             select * from vw_beneficiary_attribute_errors
         """)
         mismatch_df = pd.read_sql(mismatch_query, conn)
-        mismatch_df.to_csv(os.path.join(data_dir, "beneficiary_attribute_mismatches.csv"), index=False)
+        if export: mismatch_df.to_csv(os.path.join(data_dir, "beneficiary_attribute_mismatches.csv"), index=False)
 
         # 4. Focus on Beneficiary Date Differences (unexpected)
         date_diff_query = text("""
             select * from vw_bene_dt_differences
         """)
         date_diff_df = pd.read_sql(date_diff_query, conn)
-        date_diff_df.to_csv(os.path.join(data_dir, "beneficiary_date_differences.csv"), index=False)
+        if export: date_diff_df.to_csv(os.path.join(data_dir, "beneficiary_date_differences.csv"), index=False)
 
         # 5. Comprehensive Beneficiary Differences
         comprehensive_query = text("""
             select * from vw_beneficiary_lines_not_identical
         """)
         comprehensive_df = pd.read_sql(comprehensive_query, conn)
-        comprehensive_df.to_csv(os.path.join(data_dir, "comprehensive_beneficiary_differences.csv"), index=False)        
+        if export: comprehensive_df.to_csv(os.path.join(data_dir, "comprehensive_beneficiary_differences.csv"), index=False)        
 
         # 6. Audit Beneficiary Summary
         audit_beneficiary_query = text("""
@@ -221,11 +221,12 @@ def compare_beneficiaries():
                 PPPYMT_CAR = 1
         """)
         audit_beneficiary_df = pd.read_sql(audit_beneficiary_query, conn)
-        audit_beneficiary_df.to_csv(os.path.join(data_dir, "audit_beneficiary_summary.csv"), index=False)
+        if export: audit_beneficiary_df.to_csv(os.path.join(data_dir, "audit_beneficiary_summary.csv"), index=False)
     
     return {
         "bene_records_with_discrepancies": len(audit_beneficiary_df),
-        "missing_count": len(missing_df_1) + len(missing_df_2),
+        "missing_count": len(missing_df_1),
+        "extra_count": len(missing_df_2),
         "mismatch_count": len(mismatch_df),
         "date_diff_count": len(date_diff_df),
         "comprehensive_beneficiary_count": len(comprehensive_df),
@@ -237,24 +238,24 @@ def compare_beneficiaries():
         "bene_records_with_discrepancies_sample": audit_beneficiary_df.head()
     }
 
-def compare_claims():
+def compare_claims(export=True):
     """
     Compares source and new carrier claims.
     """
     with engine.connect() as conn:
-        # 1. Claims present in Source but missing in New
+        # 1. Claim-level mismatches in either direction (FINDING says which)
         missing_query = text("""
             select * from vw_claim_mismatches
         """)
         missing_df = pd.read_sql(missing_query, conn)
-        missing_df.to_csv(os.path.join(data_dir, "missing_claims.csv"), index=False)        
+        if export: missing_df.to_csv(os.path.join(data_dir, "missing_claims.csv"), index=False)        
         # 2. Payment Amount Discrepancies
         # Compare Line 1 Payment amount as a proxy for financial accuracy
         payment_diff_query_sample = text("""
             select * from vw_claim_line_nch_pmt_amt_1_differences;
         """)
         payment_diff_df_sample = pd.read_sql(payment_diff_query_sample, conn)
-        payment_diff_df_sample.to_csv(os.path.join(data_dir, "claim_payment_amount_discrepancies.csv"), index=False)
+        if export: payment_diff_df_sample.to_csv(os.path.join(data_dir, "claim_payment_amount_discrepancies.csv"), index=False)
         # 3. Comprehensive List of Orphan Claims
         # When doing a 4 way match(DESYNPUF_ID, CLM_ID, CLM_FROM_DT, CLM_THRU_DT)
         # there are many more orphan claims in the new system
@@ -262,7 +263,7 @@ def compare_claims():
             select * from carrier_claims_orphans
         """)
         comprehensive_orphan_claims_df = pd.read_sql(comprehensive_orphan_claims, conn)
-        comprehensive_orphan_claims_df.to_csv(os.path.join(data_dir, "comprehensive_orphan_claims.csv"), index=False)
+        if export: comprehensive_orphan_claims_df.to_csv(os.path.join(data_dir, "comprehensive_orphan_claims.csv"), index=False)
 
         # 4. Audit Claim Summary
         audit_claim_query = text("""
@@ -409,11 +410,12 @@ def compare_claims():
                 LINE_ICD9_DGNS_CD_13 = 1
         """)
         audit_claim_df = pd.read_sql(audit_claim_query, conn)
-        audit_claim_df.to_csv(os.path.join(data_dir, "audit_claim_summary.csv"), index=False)
+        if export: audit_claim_df.to_csv(os.path.join(data_dir, "audit_claim_summary.csv"), index=False)
 
     return {
         "claim_records_with_discrepancies": len(audit_claim_df),
-        "missing_claims_count": len(missing_df),
+        "missing_claims_count": int(missing_df["FINDING"].str.contains("Missing in New", na=False).sum()),
+        "new_only_claims_count": int(missing_df["FINDING"].str.contains("Present in New", na=False).sum()),
         "payment_mismatch_count": len(payment_diff_df_sample),
         "comprehensive_orphan_claims_count": len(comprehensive_orphan_claims_df),
         "payment_mismatch_sample": payment_diff_df_sample.head(),

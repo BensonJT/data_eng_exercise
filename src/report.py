@@ -49,6 +49,16 @@ def html_table_footer():
     """Close HTML table"""
     return '  </tbody>\n</table>\n\n'
 
+GO_SIGMA, MIN_SIGMA = 4.5, 4.0  # dashboard thresholds: >= 4.5 GO, 4.0-4.5 CAUTION, < 4.0 NO-GO
+
+
+def overall_sigma(row):
+    """Overall sigma as the dashboard shows it: inverse normal of yield + 1.5 (SIX_SIGMA from compare.py).
+    Falls back to the view's SIGMA_LEVEL, an older SQL approximation, only if SIX_SIGMA is absent."""
+    v = row.get('SIX_SIGMA') if hasattr(row, 'get') else None
+    return float(v) if v is not None and v == v else float(row['SIGMA_LEVEL'])
+
+
 def generate_report_md(bene_res, claims_res, six_sigma_res, financial_impact_res, output_path="report.md"):
     """
     Generates a comprehensive Markdown report from the comparison results.
@@ -71,6 +81,24 @@ def generate_report_md(bene_res, claims_res, six_sigma_res, financial_impact_res
         f.write("This report evaluates the quality of the healthcare claims data migration from the legacy ")
         f.write("system (Source) to the new system (New). The analysis employs Six Sigma methodology to ")
         f.write("quantify data quality and identifies areas requiring remediation.\n\n")
+
+        # Headline recommendation, tested against the data
+        six_sigma_overall = six_sigma_res['six_sigma']
+        carrier_fields = six_sigma_res['six_sigma_carrier']
+        nogo_fields = int((carrier_fields['SIGMA_LEVEL'] < MIN_SIGMA).sum())
+        n_fields = len(carrier_fields)
+        record_issues = (bene_res['missing_count'] + bene_res.get('extra_count', 0)
+                         + claims_res['missing_claims_count'] + claims_res.get('new_only_claims_count', 0))
+        overall_pass = all(overall_sigma(r) >= GO_SIGMA for _, r in six_sigma_overall.iterrows())
+        blocked = nogo_fields > 0 or record_issues > 0
+        if blocked:
+            f.write("**Recommendation: do not proceed with the migration as is.** ")
+            if overall_pass:
+                f.write(f"Overall quality passes the {GO_SIGMA}σ target, but ")
+            f.write(f"{nogo_fields} of {n_fields} carrier claim fields fall below the {MIN_SIGMA}σ minimum and "
+                    f"{record_issues:,} records were added, lost or re-identified. Remediate, then re-run this analysis as the gate.\n\n")
+        else:
+            f.write("**Recommendation: proceed.** Every field clears the minimum and no records were added or lost.\n\n")
         
         # Migration Scorecard
         f.write("### Migration Scorecard\n\n")
@@ -81,8 +109,8 @@ def generate_report_md(bene_res, claims_res, six_sigma_res, financial_impact_res
         six_sigma_overall = six_sigma_res['six_sigma']
         for _, row in six_sigma_overall.iterrows():
             subject = row['SUBJECT']
-            sigma = row['SIGMA_LEVEL']
-            dpmo = int(row['DPMO'])
+            sigma = overall_sigma(row)
+            dpmo = int(round(row['DPMO']))
             yield_pct = row['YIELD'] * 100
             
             # Determine status emoji
@@ -99,9 +127,12 @@ def generate_report_md(bene_res, claims_res, six_sigma_res, financial_impact_res
             
             f.write(f"| {subject} Quality | {sigma:.2f}σ ({dpmo:,} DPMO, {yield_pct:.2f}% yield) | {status} |\n")
         
-        f.write(f"| Missing Beneficiaries | {bene_res['missing_count']:,} | {'❌ Critical' if bene_res['missing_count'] > 100 else '⚠️ Review'} |\n")
+        f.write(f"| Carrier Claim Fields Below {MIN_SIGMA}σ | {nogo_fields} of {n_fields} | {'❌ NO-GO' if nogo_fields else '✅ None'} |\n")
+        f.write(f"| Beneficiaries Missing from New System | {bene_res['missing_count']:,} | {'❌ Critical' if bene_res['missing_count'] > 0 else '✅ None'} |\n")
+        f.write(f"| Beneficiary IDs in New System Only | {bene_res.get('extra_count', 0):,} | {'❌ Critical' if bene_res.get('extra_count', 0) > 0 else '✅ None'} |\n")
         f.write(f"| Beneficiary Records with Defects | {bene_res['bene_records_with_discrepancies']:,} | {'❌ Critical' if bene_res['bene_records_with_discrepancies'] > 1000 else '⚠️ Review'} |\n")
-        f.write(f"| Missing Claims | {claims_res['missing_claims_count']:,} | {'❌ Critical' if claims_res['missing_claims_count'] > 1000 else '⚠️ Review'} |\n")
+        f.write(f"| Claims Missing from New System | {claims_res['missing_claims_count']:,} | {'❌ Critical' if claims_res['missing_claims_count'] > 0 else '✅ None'} |\n")
+        f.write(f"| Claims in New System Only | {claims_res.get('new_only_claims_count', 0):,} | {'❌ Critical' if claims_res.get('new_only_claims_count', 0) > 0 else '✅ None'} |\n")
         f.write(f"| Claim Records with Defects | {claims_res['claim_records_with_discrepancies']:,} | {'❌ Critical' if claims_res['claim_records_with_discrepancies'] > 1000 else '⚠️ Review'} |\n")
         f.write(f"| Payment Discrepancies | {claims_res['payment_mismatch_count']:,} | {'❌ Critical' if claims_res['payment_mismatch_count'] > 10000 else '⚠️ Review'} |\n")
         f.write("\n")
@@ -122,7 +153,7 @@ def generate_report_md(bene_res, claims_res, six_sigma_res, financial_impact_res
         f.write("|---------|-------------|---------------|-------------|------|----------|\n")
         for _, row in six_sigma_overall.iterrows():
             f.write(f"| {row['SUBJECT']} | {int(row['TOTAL_UNITS']):,} | {int(row['TOTAL_DEFECTS']):,} | ")
-            f.write(f"{row['SIGMA_LEVEL']:.2f}σ | {int(row['DPMO']):,} | {row['YIELD']*100:.2f}% |\n")
+            f.write(f"{overall_sigma(row):.2f}σ | {int(round(row['DPMO'])):,} | {row['YIELD']*100:.2f}% |\n")
         f.write("\n")
         
         f.write("📊 **Detailed Analysis**: \n\n")
@@ -233,7 +264,7 @@ def generate_report_md(bene_res, claims_res, six_sigma_res, financial_impact_res
         f.write("| Discrepancy Type | Count | CSV Export |\n")
         f.write("|------------------|-------|------------|\n")
         f.write(f"| Missing in New System | {bene_res['missing_count']:,} | [missing_beneficiaries.csv](data/missing_beneficiaries.csv) |\n")
-        f.write(f"| Extra in New System | {len(bene_res['extra_sample']):,} | [extra_beneficiaries.csv](data/extra_beneficiaries.csv) |\n")
+        f.write(f"| Extra in New System | {bene_res.get('extra_count', len(bene_res['extra_sample'])):,} | [extra_beneficiaries.csv](data/extra_beneficiaries.csv) |\n")
         f.write(f"| Attribute Mismatches | {bene_res['mismatch_count']:,} | [beneficiary_attribute_mismatches.csv](data/beneficiary_attribute_mismatches.csv) |\n")
         f.write(f"| Date Differences (DOB/DOD) | {bene_res['date_diff_count']:,} | [beneficiary_date_differences.csv](data/beneficiary_date_differences.csv) |\n")
         f.write(f"| Comprehensive Line Differences | {bene_res['comprehensive_beneficiary_count']:,} | [comprehensive_beneficiary_differences.csv](data/comprehensive_beneficiary_differences.csv) |\n")
@@ -259,7 +290,7 @@ def generate_report_md(bene_res, claims_res, six_sigma_res, financial_impact_res
         f.write("- **Action required**: Investigate ETL process - these records may indicate data loss during migration\n")
         f.write("- **Business impact**: Missing beneficiaries = missing claims = potential revenue loss\n\n")
         
-        f.write("**2. [extra_beneficiaries.csv](data/extra_beneficiaries.csv)** ({:,} records)\n\n".format(len(bene_res['extra_sample'])))
+        f.write("**2. [extra_beneficiaries.csv](data/extra_beneficiaries.csv)** ({:,} records)\n\n".format(bene_res.get('extra_count', len(bene_res['extra_sample']))))
         f.write("- **Columns**: DESYNPUF_ID, BENE_DEATH_YEAR, YEAR, FINDING\n")
         f.write("- **What it shows**: Beneficiaries present in new system but NOT in source system\n")
         f.write("- **Possible causes**: Duplicate creation, test data leakage, or incorrect source extraction\n")
@@ -311,7 +342,8 @@ def generate_report_md(bene_res, claims_res, six_sigma_res, financial_impact_res
         f.write("### Summary of Claims Discrepancies\n\n")
         f.write("| Discrepancy Type | Count | CSV Export |\n")
         f.write("|------------------|-------|------------|\n")
-        f.write(f"| Missing Claims | {claims_res['missing_claims_count']:,} | [missing_claims.csv](data/missing_claims.csv) |\n")
+        f.write(f"| Claims in New System, Not in Source | {claims_res.get('new_only_claims_count', 0):,} | [missing_claims.csv](data/missing_claims.csv) |\n")
+        f.write(f"| Claims in Source, Missing from New System | {claims_res['missing_claims_count']:,} | [missing_claims.csv](data/missing_claims.csv) |\n")
         f.write(f"| Payment Amount Discrepancies | {claims_res['payment_mismatch_count']:,} | [claim_payment_amount_discrepancies.csv](data/claim_payment_amount_discrepancies.csv) |\n")
         f.write(f"| Orphan Claims (4-way match) | {claims_res['comprehensive_orphan_claims_count']:,} | [comprehensive_orphan_claims.csv](data/comprehensive_orphan_claims.csv) |\n")
         f.write(f"| Claim Audit Sample | {claims_res['claim_records_with_discrepancies']:,} | [claim_records_with_discrepancies_sample.csv](data/audit_claim_summary.csv) |\n")
@@ -327,7 +359,7 @@ def generate_report_md(bene_res, claims_res, six_sigma_res, financial_impact_res
         # Detailed CSV Documentation for Claims
         f.write("### Detailed CSV Exports - Claims Analysis\n\n")
         
-        f.write("**1. [missing_claims.csv](data/missing_claims.csv)** ({:,} records)\n\n".format(claims_res['missing_claims_count']))
+        f.write("**1. [missing_claims.csv](data/missing_claims.csv)** ({:,} records; the FINDING column says which direction)\n\n".format(claims_res['missing_claims_count'] + claims_res.get('new_only_claims_count', 0)))
         f.write("- **Columns**: CLM_ID, FINDING\n")
         f.write("- **What it shows**: Claims present in source OR new system (UNION of both directions)\n")
         f.write("- **FINDING values**:\n")
@@ -383,13 +415,19 @@ def generate_report_md(bene_res, claims_res, six_sigma_res, financial_impact_res
         
         # Six Sigma based recommendations
         for _, row in six_sigma_overall.iterrows():
-            if row['SIGMA_LEVEL'] < 3.0:
-                recommendations.append(f"**CRITICAL**: {row['SUBJECT']} quality is below acceptable threshold ({row['SIGMA_LEVEL']:.2f}σ). "
+            if overall_sigma(row) < 3.0:
+                recommendations.append(f"**CRITICAL**: {row['SUBJECT']} quality is below acceptable threshold ({overall_sigma(row):.2f}σ). "
                                      f"Immediate root cause analysis required for {int(row['TOTAL_DEFECTS']):,} defects.")
-            elif row['SIGMA_LEVEL'] < 4.0:
-                recommendations.append(f"**HIGH PRIORITY**: {row['SUBJECT']} quality should be improved ({row['SIGMA_LEVEL']:.2f}σ). "
+            elif overall_sigma(row) < 4.0:
+                recommendations.append(f"**HIGH PRIORITY**: {row['SUBJECT']} quality should be improved ({overall_sigma(row):.2f}σ). "
                                      f"Target 4σ or higher before production deployment.")
         
+        # Field-level gate (matches the dashboard's Go / No-Go tab)
+        if nogo_fields:
+            names = ", ".join(carrier_fields.loc[carrier_fields['SIGMA_LEVEL'] < MIN_SIGMA, 'FIELD_FAMILY'].tolist())
+            recommendations.append(f"**NO-GO FIELDS**: {nogo_fields} of {n_fields} carrier claim fields are below {MIN_SIGMA}σ ({names}). "
+                                 f"Remediation is required before go-live.")
+
         # Field-specific recommendations
         top_carrier_field = six_sigma_res['six_sigma_carrier'].nlargest(1, 'TOTAL_DEFECTS').iloc[0]
         recommendations.append(f"**FOCUS AREA**: {top_carrier_field['FIELD_FAMILY']} has {int(top_carrier_field['TOTAL_DEFECTS']):,} defects. "
@@ -403,16 +441,20 @@ def generate_report_md(bene_res, claims_res, six_sigma_res, financial_impact_res
                                  f"(${top_financial['FINANCIAL_VARIANCE']:,.2f}). Address this field first for maximum impact.")
         
         # Missing data recommendations
-        if bene_res['missing_count'] > 100:
-            recommendations.append(f"**DATA LOSS**: {bene_res['missing_count']:,} beneficiaries missing in new system. "
-                                 f"Verify ETL completeness and investigate potential data loss.")
+        if bene_res['missing_count'] > 0 or bene_res.get('extra_count', 0) > 0:
+            recommendations.append(f"**IDENTITY**: {bene_res['missing_count']:,} beneficiaries are missing from the new system and "
+                                 f"{bene_res.get('extra_count', 0):,} IDs appear there that the source never had. If these are the same people, "
+                                 f"the migration rewrote identifiers. Row counts match, which hides this.")
 
         if bene_res['bene_records_with_discrepancies'] > 1000:
             recommendations.append(f"**DATA DISCREPANCIES**: {bene_res['bene_records_with_discrepancies']:,} beneficiaries data discrepancies in new system. "
                                  f"Review ingestion logs and verify source-to-target mapping at the field level.")
         
-        if claims_res['missing_claims_count'] > 1000:
-            recommendations.append(f"**DATA LOSS**: {claims_res['missing_claims_count']:,} claims missing in new system. "
+        if claims_res.get('new_only_claims_count', 0) > 0:
+            recommendations.append(f"**UNEXPECTED RECORDS**: {claims_res['new_only_claims_count']:,} claims exist in the new system but not in the source. "
+                                 f"Review ingestion logs and verify source-to-target mapping.")
+        if claims_res['missing_claims_count'] > 0:
+            recommendations.append(f"**DATA LOSS**: {claims_res['missing_claims_count']:,} claims are missing from the new system. "
                                  f"Review ingestion logs and verify source-to-target mapping.")
 
         if claims_res['claim_records_with_discrepancies'] > 1000:
@@ -427,28 +469,20 @@ def generate_report_md(bene_res, claims_res, six_sigma_res, financial_impact_res
         f.write("---\n\n")
         f.write("## Conclusion\n\n")
         
-        overall_sigma_avg = six_sigma_overall['SIGMA_LEVEL'].mean()
-        if overall_sigma_avg >= 6.0:
-            f.write("The migration demonstrates **world-class quality** with an average sigma level of {:.2f}σ. ".format(overall_sigma_avg))
-            f.write("No remedial action required.\n\n")
-        elif overall_sigma_avg >= 5.0:
-            f.write("The migration demonstrates **excellent overall quality** with an average sigma level of {:.2f}σ. ".format(overall_sigma_avg))
-            f.write("Little remedial action required depending on severity of identified discrepancies.\n\n")
-        elif overall_sigma_avg >= 4.0:
-            f.write("The migration demonstrates **good overall quality** with an average sigma level of {:.2f}σ. ".format(overall_sigma_avg))
-            f.write("Remedial action required.\n\n")
-        elif overall_sigma_avg >= 3.0:
-            f.write("The migration shows **acceptable quality** with an average sigma level of {:.2f}σ, ".format(overall_sigma_avg))
-            f.write("however, significant improvements are needed in specific areas before production deployment.\n\n")
+        overall_sigma_avg = sum(overall_sigma(r) for _, r in six_sigma_overall.iterrows()) / len(six_sigma_overall)
+        if blocked:
+            f.write("**Do not proceed with the migration as is.** ")
+            f.write(f"Overall quality averages {overall_sigma_avg:.2f}σ, ")
+            f.write("which looks acceptable, but the average hides categorical failures: " if overall_pass else "and ")
+            f.write(f"{nogo_fields} of {n_fields} carrier claim fields are below {MIN_SIGMA}σ and {record_issues:,} records were added, lost or re-identified.\n\n")
         else:
-            f.write("The migration quality is **below acceptable standards** with an average sigma level of {:.2f}σ. ".format(overall_sigma_avg))
-            f.write("**DO NOT PROCEED** with production cutover until critical issues are resolved.\n\n")
-        
+            f.write(f"The migration meets the quality gates, averaging {overall_sigma_avg:.2f}σ with no field below {MIN_SIGMA}σ and no record-level losses.\n\n")
+
         f.write("**Next Steps:**\n")
         f.write("1. Review detailed CSV exports for complete defect lists\n")
         f.write("2. Prioritize remediation based on Six Sigma and Financial Impact analysis\n")
         f.write("3. Re-run comparison after implementing fixes\n")
-        f.write("4. Target minimum 4σ quality before production deployment\n\n")
+        f.write(f"4. Proceed only when every field clears {MIN_SIGMA}σ, both tables clear {GO_SIGMA}σ, and no records are added, lost or re-identified\n\n")
         
         f.write("---\n\n")
         f.write("_Report generated by Data Migration Quality Assessment Pipeline_\n")

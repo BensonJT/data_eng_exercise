@@ -134,6 +134,8 @@
 
 <p>This report evaluates the quality of the healthcare claims data migration from the legacy system (Source) to the new system (New). The analysis employs Six Sigma methodology to quantify data quality and identifies areas requiring remediation.</p>
 
+<p><strong>Recommendation: do not proceed with the migration as is.</strong> Overall quality passes the 4.5σ target, but 7 of 13 carrier claim fields fall below the 4.0σ minimum and 5,095 records were added, lost or re-identified. Remediate, then re-run this analysis as the gate.</p>
+
 <h3>Migration Scorecard</h3>
 
 <table>
@@ -148,16 +150,26 @@
 <p>|--------|-------|--------|</p>
 <tr>
 <td>Carrier Claims Quality</td>
-<td>4.58σ (1,095 DPMO, 99.89% yield)</td>
+<td>4.56σ (1,095 DPMO, 99.89% yield)</td>
 <td>☑️ Good</td>
 </tr>
 <tr>
 <td>Beneficiary Summary Quality</td>
-<td>4.68σ (768 DPMO, 99.92% yield)</td>
+<td>4.67σ (769 DPMO, 99.92% yield)</td>
 <td>☑️ Good</td>
 </tr>
 <tr>
-<td>Missing Beneficiaries</td>
+<td>Carrier Claim Fields Below 4.0σ</td>
+<td>7 of 13</td>
+<td class="status-critical">❌ NO-GO</td>
+</tr>
+<tr>
+<td>Beneficiaries Missing from New System</td>
+<td class="number-cell">159</td>
+<td class="status-critical">❌ Critical</td>
+</tr>
+<tr>
+<td>Beneficiary IDs in New System Only</td>
 <td class="number-cell">159</td>
 <td class="status-critical">❌ Critical</td>
 </tr>
@@ -167,7 +179,12 @@
 <td class="status-acceptable">⚠️ Review</td>
 </tr>
 <tr>
-<td>Missing Claims</td>
+<td>Claims Missing from New System</td>
+<td class="number-cell">0</td>
+<td class="status-excellent">✅ None</td>
+</tr>
+<tr>
+<td>Claims in New System Only</td>
 <td class="number-cell">4,777</td>
 <td class="status-critical">❌ Critical</td>
 </tr>
@@ -214,7 +231,7 @@
 <td>Carrier Claims</td>
 <td class="number-cell">4,746,577</td>
 <td class="number-cell">530,376</td>
-<td class="number-cell">4.58σ</td>
+<td class="number-cell">4.56σ</td>
 <td class="number-cell">1,095</td>
 <td>99.89%</td>
 </tr>
@@ -222,8 +239,8 @@
 <td>Beneficiary Summary</td>
 <td class="number-cell">343,803</td>
 <td class="number-cell">8,193</td>
-<td class="number-cell">4.68σ</td>
-<td class="number-cell">768</td>
+<td class="number-cell">4.67σ</td>
+<td class="number-cell">769</td>
 <td>99.92%</td>
 </tr>
 </tbody>
@@ -539,7 +556,7 @@
 </tr>
 <tr>
 <td>Extra in New System</td>
-<td class="number-cell">0</td>
+<td class="number-cell">159</td>
 <td>[extra_beneficiaries.csv](data/extra_beneficiaries.csv)</td>
 </tr>
 <tr>
@@ -635,7 +652,7 @@
 <li><strong>Action required</strong>: Investigate ETL process - these records may indicate data loss during migration</li>
 <li><strong>Business impact</strong>: Missing beneficiaries = missing claims = potential revenue loss</li>
 </ul>
-<p><strong>2. <a href="data/extra_beneficiaries.csv">extra_beneficiaries.csv</a></strong> (0 records)</p>
+<p><strong>2. <a href="data/extra_beneficiaries.csv">extra_beneficiaries.csv</a></strong> (159 records)</p>
 
 <ul>
 <li><strong>Columns</strong>: DESYNPUF_ID, BENE_DEATH_YEAR, YEAR, FINDING</li>
@@ -707,8 +724,13 @@
 <tbody>
 <p>|------------------|-------|------------|</p>
 <tr>
-<td>Missing Claims</td>
+<td>Claims in New System, Not in Source</td>
 <td class="number-cell">4,777</td>
+<td>[missing_claims.csv](data/missing_claims.csv)</td>
+</tr>
+<tr>
+<td>Claims in Source, Missing from New System</td>
+<td class="number-cell">0</td>
 <td>[missing_claims.csv](data/missing_claims.csv)</td>
 </tr>
 <tr>
@@ -743,39 +765,39 @@
 <tbody>
 <p>|----------------:|--------------:|----------:|----------:|-----------:|</p>
 <tr>
-<td class="number-cell">887183387821152</td>
-<td class="number-cell">20101109</td>
-<td class="number-cell">30</td>
-<td class="number-cell">27</td>
-<td class="number-cell">3</td>
-</tr>
-<tr>
-<td class="number-cell">887473386966448</td>
-<td class="number-cell">20080531</td>
+<td class="number-cell">554758788410650</td>
+<td class="number-cell">20100405</td>
 <td class="number-cell">0</td>
-<td class="number-cell">5</td>
-<td class="number-cell">-5</td>
+<td class="number-cell">70.07</td>
+<td class="number-cell">-70.07</td>
 </tr>
 <tr>
-<td class="number-cell">887883389139678</td>
-<td class="number-cell">20100629</td>
+<td class="number-cell">242405344065082</td>
+<td class="number-cell">20090702</td>
 <td class="number-cell">0</td>
-<td class="number-cell">5</td>
-<td class="number-cell">-5</td>
+<td class="number-cell">331.65</td>
+<td class="number-cell">-331.65</td>
 </tr>
 <tr>
-<td class="number-cell">887913386549027</td>
-<td class="number-cell">20090407</td>
-<td class="number-cell">60</td>
-<td class="number-cell">54</td>
-<td class="number-cell">6</td>
+<td class="number-cell">271927215482467</td>
+<td class="number-cell">20090811</td>
+<td class="number-cell">0</td>
+<td class="number-cell">300.49</td>
+<td class="number-cell">-300.49</td>
 </tr>
 <tr>
-<td class="number-cell">887723388459696</td>
-<td class="number-cell">20080324</td>
-<td class="number-cell">20</td>
-<td class="number-cell">18</td>
-<td class="number-cell">2</td>
+<td class="number-cell">623972651645995</td>
+<td class="number-cell">20090616</td>
+<td class="number-cell">0</td>
+<td class="number-cell">66.84</td>
+<td class="number-cell">-66.84</td>
+</tr>
+<tr>
+<td class="number-cell">288924549394887</td>
+<td class="number-cell">20090919</td>
+<td class="number-cell">0</td>
+<td class="number-cell">184.69</td>
+<td class="number-cell">-184.69</td>
 </tr>
 </tbody>
 </table>
@@ -783,7 +805,7 @@
 
 <h3>Detailed CSV Exports - Claims Analysis</h3>
 
-<p><strong>1. <a href="data/missing_claims.csv">missing_claims.csv</a></strong> (4,777 records)</p>
+<p><strong>1. <a href="data/missing_claims.csv">missing_claims.csv</a></strong> (4,777 records; the FINDING column says which direction)</p>
 
 <ul>
 <li><strong>Columns</strong>: CLM_ID, FINDING</li>
@@ -842,27 +864,29 @@
 
 <h2>5. Recommendations</h2>
 
-<p>1. <strong>FOCUS AREA</strong>: LINE_PRCSG_IND_CD has 75,497 defects. Prioritize data cleansing and transformation logic review for this field.</p>
+<p>1. <strong>NO-GO FIELDS</strong>: 7 of 13 carrier claim fields are below 4.0σ (LINE_PRCSG_IND_CD, LINE_ICD9_DGNS_CD, TAX_NUM, PRF_PHYSN_NPI, HCPCS_CD, ICD9_DGNS_CD, LINE_NCH_PMT_AMT). Remediation is required before go-live.</p>
 
-<p>2. <strong>FINANCIAL PRIORITY</strong>: LINE_NCH_PMT_AMT accounts for 36.5% of total financial variance ($158,480.91). Address this field first for maximum impact.</p>
+<p>2. <strong>FOCUS AREA</strong>: LINE_PRCSG_IND_CD has 75,497 defects. Prioritize data cleansing and transformation logic review for this field.</p>
 
-<p>3. <strong>DATA LOSS</strong>: 159 beneficiaries missing in new system. Verify ETL completeness and investigate potential data loss.</p>
+<p>3. <strong>FINANCIAL PRIORITY</strong>: LINE_NCH_PMT_AMT accounts for 36.5% of total financial variance ($158,480.91). Address this field first for maximum impact.</p>
 
-<p>4. <strong>DATA LOSS</strong>: 4,777 claims missing in new system. Review ingestion logs and verify source-to-target mapping.</p>
+<p>4. <strong>IDENTITY</strong>: 159 beneficiaries are missing from the new system and 159 IDs appear there that the source never had. If these are the same people, the migration rewrote identifiers. Row counts match, which hides this.</p>
 
-<p>5. <strong>DATA DISCREPANCIES</strong>: 25,320 claims data discrepancies in new system. Review ingestion logs and verify source-to-target mapping at the field level.</p>
+<p>5. <strong>UNEXPECTED RECORDS</strong>: 4,777 claims exist in the new system but not in the source. Review ingestion logs and verify source-to-target mapping.</p>
+
+<p>6. <strong>DATA DISCREPANCIES</strong>: 25,320 claims data discrepancies in new system. Review ingestion logs and verify source-to-target mapping at the field level.</p>
 
 <hr>
 
 <h2>Conclusion</h2>
 
-<p>The migration demonstrates <strong>good overall quality</strong> with an average sigma level of 4.63σ. Remedial action required.</p>
+<p><strong>Do not proceed with the migration as is.</strong> Overall quality averages 4.62σ, which looks acceptable, but the average hides categorical failures: 7 of 13 carrier claim fields are below 4.0σ and 5,095 records were added, lost or re-identified.</p>
 
 <p><strong>Next Steps:</strong></p>
 <p>1. Review detailed CSV exports for complete defect lists</p>
 <p>2. Prioritize remediation based on Six Sigma and Financial Impact analysis</p>
 <p>3. Re-run comparison after implementing fixes</p>
-<p>4. Target minimum 4σ quality before production deployment</p>
+<p>4. Proceed only when every field clears 4.0σ, both tables clear 4.5σ, and no records are added, lost or re-identified</p>
 
 <hr>
 

@@ -52,7 +52,17 @@ def main():
         run_transform()
         logger.info("✅ Transformation complete")
 
-    if args.all or args.ingest or args.validate or args.transform or args.compare:
+    pipeline_stage = args.all or args.ingest or args.validate or args.transform or args.compare
+    if args.report and not pipeline_stage:
+        # Report only: read the existing views (no CSV exports rewritten) and regenerate report.md and report.html.
+        logger.info("Generating reports from the existing database views...")
+        generate_report_md(compare_beneficiaries(export=False), compare_claims(export=False),
+                           calc_six_sigma(export=False), calc_financial_impact(export=False))
+        import subprocess
+        subprocess.run(["python3", "convert_report_to_html.py"], check=True, cwd=os.path.dirname(os.path.abspath(__file__)))
+        logger.info("✅ Both reports generated: report.md and report.html")
+
+    if pipeline_stage:
         logger.info("Running comparison...")
         run_comparison()
         logger.info("✅ Comparison complete")

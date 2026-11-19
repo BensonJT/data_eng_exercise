@@ -4,15 +4,20 @@
 
 This report evaluates the quality of the healthcare claims data migration from the legacy system (Source) to the new system (New). The analysis employs Six Sigma methodology to quantify data quality and identifies areas requiring remediation.
 
+**Recommendation: do not proceed with the migration as is.** Overall quality passes the 4.5σ target, but 7 of 13 carrier claim fields fall below the 4.0σ minimum and 5,095 records were added, lost or re-identified. Remediate, then re-run this analysis as the gate.
+
 ### Migration Scorecard
 
 | Metric | Value | Status |
 |--------|-------|--------|
-| Carrier Claims Quality | 4.58σ (1,095 DPMO, 99.89% yield) | ☑️ Good |
-| Beneficiary Summary Quality | 4.68σ (768 DPMO, 99.92% yield) | ☑️ Good |
-| Missing Beneficiaries | 159 | ❌ Critical |
+| Carrier Claims Quality | 4.56σ (1,095 DPMO, 99.89% yield) | ☑️ Good |
+| Beneficiary Summary Quality | 4.67σ (769 DPMO, 99.92% yield) | ☑️ Good |
+| Carrier Claim Fields Below 4.0σ | 7 of 13 | ❌ NO-GO |
+| Beneficiaries Missing from New System | 159 | ❌ Critical |
+| Beneficiary IDs in New System Only | 159 | ❌ Critical |
 | Beneficiary Records with Defects | 820 | ⚠️ Review |
-| Missing Claims | 4,777 | ❌ Critical |
+| Claims Missing from New System | 0 | ✅ None |
+| Claims in New System Only | 4,777 | ❌ Critical |
 | Claim Records with Defects | 25,320 | ❌ Critical |
 | Payment Discrepancies | 82,699 | ❌ Critical |
 
@@ -31,8 +36,8 @@ This report evaluates the quality of the healthcare claims data migration from t
 
 | Dataset | Total Units | Total Defects | Sigma Level | DPMO | Yield % |
 |---------|-------------|---------------|-------------|------|----------|
-| Carrier Claims | 4,746,577 | 530,376 | 4.58σ | 1,095 | 99.89% |
-| Beneficiary Summary | 343,803 | 8,193 | 4.68σ | 768 | 99.92% |
+| Carrier Claims | 4,746,577 | 530,376 | 4.56σ | 1,095 | 99.89% |
+| Beneficiary Summary | 343,803 | 8,193 | 4.67σ | 769 | 99.92% |
 
 📊 **Detailed Analysis**: 
 
@@ -152,7 +157,7 @@ This report evaluates the quality of the healthcare claims data migration from t
 | Discrepancy Type | Count | CSV Export |
 |------------------|-------|------------|
 | Missing in New System | 159 | [missing_beneficiaries.csv](data/missing_beneficiaries.csv) |
-| Extra in New System | 0 | [extra_beneficiaries.csv](data/extra_beneficiaries.csv) |
+| Extra in New System | 159 | [extra_beneficiaries.csv](data/extra_beneficiaries.csv) |
 | Attribute Mismatches | 178 | [beneficiary_attribute_mismatches.csv](data/beneficiary_attribute_mismatches.csv) |
 | Date Differences (DOB/DOD) | 178 | [beneficiary_date_differences.csv](data/beneficiary_date_differences.csv) |
 | Comprehensive Line Differences | 1,322 | [comprehensive_beneficiary_differences.csv](data/comprehensive_beneficiary_differences.csv) |
@@ -182,7 +187,7 @@ _Showing 5 of 178 total mismatches. See CSV for complete list._
 - **Action required**: Investigate ETL process - these records may indicate data loss during migration
 - **Business impact**: Missing beneficiaries = missing claims = potential revenue loss
 
-**2. [extra_beneficiaries.csv](data/extra_beneficiaries.csv)** (0 records)
+**2. [extra_beneficiaries.csv](data/extra_beneficiaries.csv)** (159 records)
 
 - **Columns**: DESYNPUF_ID, BENE_DEATH_YEAR, YEAR, FINDING
 - **What it shows**: Beneficiaries present in new system but NOT in source system
@@ -240,7 +245,8 @@ _Showing 5 of 178 total mismatches. See CSV for complete list._
 
 | Discrepancy Type | Count | CSV Export |
 |------------------|-------|------------|
-| Missing Claims | 4,777 | [missing_claims.csv](data/missing_claims.csv) |
+| Claims in New System, Not in Source | 4,777 | [missing_claims.csv](data/missing_claims.csv) |
+| Claims in Source, Missing from New System | 0 | [missing_claims.csv](data/missing_claims.csv) |
 | Payment Amount Discrepancies | 82,699 | [claim_payment_amount_discrepancies.csv](data/claim_payment_amount_discrepancies.csv) |
 | Orphan Claims (4-way match) | 5,242 | [comprehensive_orphan_claims.csv](data/comprehensive_orphan_claims.csv) |
 | Claim Audit Sample | 25,320 | [claim_records_with_discrepancies_sample.csv](data/audit_claim_summary.csv) |
@@ -249,17 +255,17 @@ _Showing 5 of 178 total mismatches. See CSV for complete list._
 
 |          CLM_ID |   CLM_FROM_DT |   src_pmt |   new_pmt |   variance |
 |----------------:|--------------:|----------:|----------:|-----------:|
-| 887183387821152 |      20101109 |        30 |        27 |          3 |
-| 887473386966448 |      20080531 |         0 |         5 |         -5 |
-| 887883389139678 |      20100629 |         0 |         5 |         -5 |
-| 887913386549027 |      20090407 |        60 |        54 |          6 |
-| 887723388459696 |      20080324 |        20 |        18 |          2 |
+| 554758788410650 |      20100405 |         0 |     70.07 |     -70.07 |
+| 242405344065082 |      20090702 |         0 |    331.65 |    -331.65 |
+| 271927215482467 |      20090811 |         0 |    300.49 |    -300.49 |
+| 623972651645995 |      20090616 |         0 |     66.84 |     -66.84 |
+| 288924549394887 |      20090919 |         0 |    184.69 |    -184.69 |
 
 _Showing 5 of 82,699 total payment discrepancies. See CSV for complete list._
 
 ### Detailed CSV Exports - Claims Analysis
 
-**1. [missing_claims.csv](data/missing_claims.csv)** (4,777 records)
+**1. [missing_claims.csv](data/missing_claims.csv)** (4,777 records; the FINDING column says which direction)
 
 - **Columns**: CLM_ID, FINDING
 - **What it shows**: Claims present in source OR new system (UNION of both directions)
@@ -314,27 +320,29 @@ _Showing 5 of 82,699 total payment discrepancies. See CSV for complete list._
 
 ## 5. Recommendations
 
-1. **FOCUS AREA**: LINE_PRCSG_IND_CD has 75,497 defects. Prioritize data cleansing and transformation logic review for this field.
+1. **NO-GO FIELDS**: 7 of 13 carrier claim fields are below 4.0σ (LINE_PRCSG_IND_CD, LINE_ICD9_DGNS_CD, TAX_NUM, PRF_PHYSN_NPI, HCPCS_CD, ICD9_DGNS_CD, LINE_NCH_PMT_AMT). Remediation is required before go-live.
 
-2. **FINANCIAL PRIORITY**: LINE_NCH_PMT_AMT accounts for 36.5% of total financial variance ($158,480.91). Address this field first for maximum impact.
+2. **FOCUS AREA**: LINE_PRCSG_IND_CD has 75,497 defects. Prioritize data cleansing and transformation logic review for this field.
 
-3. **DATA LOSS**: 159 beneficiaries missing in new system. Verify ETL completeness and investigate potential data loss.
+3. **FINANCIAL PRIORITY**: LINE_NCH_PMT_AMT accounts for 36.5% of total financial variance ($158,480.91). Address this field first for maximum impact.
 
-4. **DATA LOSS**: 4,777 claims missing in new system. Review ingestion logs and verify source-to-target mapping.
+4. **IDENTITY**: 159 beneficiaries are missing from the new system and 159 IDs appear there that the source never had. If these are the same people, the migration rewrote identifiers. Row counts match, which hides this.
 
-5. **DATA DISCREPANCIES**: 25,320 claims data discrepancies in new system. Review ingestion logs and verify source-to-target mapping at the field level.
+5. **UNEXPECTED RECORDS**: 4,777 claims exist in the new system but not in the source. Review ingestion logs and verify source-to-target mapping.
+
+6. **DATA DISCREPANCIES**: 25,320 claims data discrepancies in new system. Review ingestion logs and verify source-to-target mapping at the field level.
 
 ---
 
 ## Conclusion
 
-The migration demonstrates **good overall quality** with an average sigma level of 4.63σ. Remedial action required.
+**Do not proceed with the migration as is.** Overall quality averages 4.62σ, which looks acceptable, but the average hides categorical failures: 7 of 13 carrier claim fields are below 4.0σ and 5,095 records were added, lost or re-identified.
 
 **Next Steps:**
 1. Review detailed CSV exports for complete defect lists
 2. Prioritize remediation based on Six Sigma and Financial Impact analysis
 3. Re-run comparison after implementing fixes
-4. Target minimum 4σ quality before production deployment
+4. Proceed only when every field clears 4.0σ, both tables clear 4.5σ, and no records are added, lost or re-identified
 
 ---
 
