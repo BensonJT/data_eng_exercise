@@ -104,6 +104,7 @@ def calc_six_sigma(export=True):
         # 4. Six Sigma Analysis for All Fields (not grouped)
         six_sigma_columns_query = text("""
             select * from vw_sigma_analysis_columns
+            ORDER BY src, TOTAL_DEFECTS DESC, column_name  -- tie-break so equal defect counts keep a stable order
         """)
         six_sigma_columns_df = pd.read_sql(six_sigma_columns_query, conn)
         
@@ -152,6 +153,7 @@ def compare_beneficiaries(export=True):
         # 1. Identify missing beneficiaries in New System
         missing_query_1 = text("""
             select * from vw_beneficiary_errors where finding = 'Error: Beneficiary Missing in New File'
+            ORDER BY ALL  -- deterministic row order so reruns produce identical CSVs
         """)
         missing_df_1 = pd.read_sql(missing_query_1, conn)
         if export: missing_df_1.to_csv(os.path.join(data_dir, "missing_beneficiaries.csv"), index=False)
@@ -159,6 +161,7 @@ def compare_beneficiaries(export=True):
         # 2. Extra beneficiaries in New System (unexpected)
         missing_query_2 = text("""
             select * from vw_beneficiary_errors where finding = 'Error: Beneficiary Present in New File, Not in Original File'
+            ORDER BY ALL  -- deterministic row order so reruns produce identical CSVs
         """)
         missing_df_2 = pd.read_sql(missing_query_2, conn)
         if export: missing_df_2.to_csv(os.path.join(data_dir, "extra_beneficiaries.csv"), index=False)
@@ -166,6 +169,7 @@ def compare_beneficiaries(export=True):
         # 3. Identify Beneficiary Attributes that Changed (unexpected)
         mismatch_query = text("""
             select * from vw_beneficiary_attribute_errors
+            ORDER BY ALL  -- deterministic row order so reruns produce identical CSVs
         """)
         mismatch_df = pd.read_sql(mismatch_query, conn)
         if export: mismatch_df.to_csv(os.path.join(data_dir, "beneficiary_attribute_mismatches.csv"), index=False)
@@ -173,6 +177,7 @@ def compare_beneficiaries(export=True):
         # 4. Focus on Beneficiary Date Differences (unexpected)
         date_diff_query = text("""
             select * from vw_bene_dt_differences
+            ORDER BY ALL  -- deterministic row order so reruns produce identical CSVs
         """)
         date_diff_df = pd.read_sql(date_diff_query, conn)
         if export: date_diff_df.to_csv(os.path.join(data_dir, "beneficiary_date_differences.csv"), index=False)
@@ -180,6 +185,7 @@ def compare_beneficiaries(export=True):
         # 5. Comprehensive Beneficiary Differences
         comprehensive_query = text("""
             select * from vw_beneficiary_lines_not_identical
+            ORDER BY ALL  -- deterministic row order so reruns produce identical CSVs
         """)
         comprehensive_df = pd.read_sql(comprehensive_query, conn)
         if export: comprehensive_df.to_csv(os.path.join(data_dir, "comprehensive_beneficiary_differences.csv"), index=False)        
@@ -219,6 +225,7 @@ def compare_beneficiaries(export=True):
                 MEDREIMB_CAR = 1 or
                 BENRES_CAR = 1 or
                 PPPYMT_CAR = 1
+            ORDER BY ALL  -- deterministic row order so reruns produce identical CSVs
         """)
         audit_beneficiary_df = pd.read_sql(audit_beneficiary_query, conn)
         if export: audit_beneficiary_df.to_csv(os.path.join(data_dir, "audit_beneficiary_summary.csv"), index=False)
@@ -246,13 +253,15 @@ def compare_claims(export=True):
         # 1. Claim-level mismatches in either direction (FINDING says which)
         missing_query = text("""
             select * from vw_claim_mismatches
+            ORDER BY ALL  -- deterministic row order so reruns produce identical CSVs
         """)
         missing_df = pd.read_sql(missing_query, conn)
         if export: missing_df.to_csv(os.path.join(data_dir, "missing_claims.csv"), index=False)        
         # 2. Payment Amount Discrepancies
         # Compare Line 1 Payment amount as a proxy for financial accuracy
         payment_diff_query_sample = text("""
-            select * from vw_claim_line_nch_pmt_amt_1_differences;
+            select * from vw_claim_line_nch_pmt_amt_1_differences
+            ORDER BY ALL  -- deterministic row order so reruns produce identical CSVs
         """)
         payment_diff_df_sample = pd.read_sql(payment_diff_query_sample, conn)
         if export: payment_diff_df_sample.to_csv(os.path.join(data_dir, "claim_payment_amount_discrepancies.csv"), index=False)
@@ -261,6 +270,7 @@ def compare_claims(export=True):
         # there are many more orphan claims in the new system
         comprehensive_orphan_claims = text("""
             select * from carrier_claims_orphans
+            ORDER BY ALL  -- deterministic row order so reruns produce identical CSVs
         """)
         comprehensive_orphan_claims_df = pd.read_sql(comprehensive_orphan_claims, conn)
         if export: comprehensive_orphan_claims_df.to_csv(os.path.join(data_dir, "comprehensive_orphan_claims.csv"), index=False)
@@ -408,6 +418,7 @@ def compare_claims(export=True):
                 LINE_ICD9_DGNS_CD_11 = 1 OR
                 LINE_ICD9_DGNS_CD_12 = 1 OR
                 LINE_ICD9_DGNS_CD_13 = 1
+            ORDER BY ALL  -- deterministic row order so reruns produce identical CSVs
         """)
         audit_claim_df = pd.read_sql(audit_claim_query, conn)
         if export: audit_claim_df.to_csv(os.path.join(data_dir, "audit_claim_summary.csv"), index=False)
