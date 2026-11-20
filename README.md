@@ -495,6 +495,8 @@ data_eng/
 - **Solution**: The pipeline uses chunked processing, but very large files may still require significant RAM
 - Close other applications to free up memory
 - Consider increasing BATCH_SIZE in `src/ingest.py` if you have more RAM available
+- DuckDB is capped by `DUCKDB_MEMORY_LIMIT` (default 4GB) and spills to `DUCKDB_TEMP_DIR`; point the temp directory at a drive with tens of GB free
+- The carrier-claims audit table (Phase 3 of `--transform`) is built in hash partitions of `DESYNPUF_ID`, so a full transform runs in about 12 minutes within a 4GB limit
 
 ### Database Errors
 
