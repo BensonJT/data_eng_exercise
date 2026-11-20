@@ -18,7 +18,16 @@ if not DUCKDB_PATH:
 
 DATABASE_URL = f"duckdb:///{DUCKDB_PATH}"
 
-engine = create_engine(DATABASE_URL)
+# Cap DuckDB memory and spill to disk on E: so large transforms don't run out of memory.
+DUCKDB_MEMORY_LIMIT = os.getenv('DUCKDB_MEMORY_LIMIT', '4GB')
+DUCKDB_TEMP_DIR = os.getenv('DUCKDB_TEMP_DIR', '/mnt/e/duckdb_tmp')
+os.makedirs(DUCKDB_TEMP_DIR, exist_ok=True)
+
+engine = create_engine(DATABASE_URL, connect_args={"config": {
+    "memory_limit": DUCKDB_MEMORY_LIMIT,
+    "temp_directory": DUCKDB_TEMP_DIR,
+    "preserve_insertion_order": False,
+}})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def get_db():

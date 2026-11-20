@@ -49,7 +49,11 @@ def main():
     # Only run transformation if we've completed ingestion (and optionally validation)
     if args.all or args.ingest or args.validate or args.transform:
         logger.info("Running data transformation (creating views and audit tables)...")
-        run_transform()
+        try:
+            run_transform()
+        except Exception as e:
+            logger.error(f"Transformation failed; stopping before comparison and reports: {e}")
+            sys.exit(1)
         logger.info("✅ Transformation complete")
 
     pipeline_stage = args.all or args.ingest or args.validate or args.transform or args.compare
